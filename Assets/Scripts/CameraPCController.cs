@@ -4,6 +4,7 @@ public class CameraPCController : MonoBehaviour
 {
     public float moveSpeed = 5.0f; // 移动速度
     public float rotateSpeed = 90.0f; // 旋转速度
+    public GameObject selectBox;
     private bool is_Selected = false; // 是否选中
     private Transform selectedTransform; // 选中的立方体的Transform
 
@@ -25,13 +26,17 @@ public class CameraPCController : MonoBehaviour
                         // 如果已经选中了一个立方体，先取消选中
                         selectedTransform = null;
                         is_Selected = false;
+                        selectBox.SetActive(is_Selected);
                     }
                     else
                     {
                         // 选中点击的立方体
                         selectedTransform = hit.transform;
                         is_Selected = true;
+                        
                     }
+
+                    if(selectedTransform != null) selectBox.SetActive(selectedTransform.gameObject == gameObject);
                 }
             }
         }
@@ -44,6 +49,7 @@ public class CameraPCController : MonoBehaviour
                 // 取消选中
                 selectedTransform = null;
                 is_Selected = false;
+                selectBox.SetActive(is_Selected);
             }
         }
 
