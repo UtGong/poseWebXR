@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>Unity WebGL Player | test-webxr-demo</title>
+    <title>Unity WebGL Player | demo-xr-viewport</title>
     <meta name="description" content="">
     <link rel="shortcut icon" href="TemplateData/favicon.ico">
     <link rel="stylesheet" href="TemplateData/style.css">
@@ -24,20 +24,20 @@
         <button id="entervr" value="Enter VR" disabled>VR</button>
         <button id="enterar" value="Enter AR" disabled>AR</button>
         <div id="unity-webxr-link">Using <a href="https://github.com/De-Panther/unity-webxr-export" target="_blank" title="WebXR Export">WebXR Export</a></div>
-        <div id="unity-build-title">test-webxr-demo</div>
+        <div id="unity-build-title">demo-xr-viewport</div>
       </div>
     </div>
     <script>
       var buildUrl = "Build";
-      var loaderUrl = buildUrl + "/Build.loader.js";
+      var loaderUrl = buildUrl + "/docs.loader.js";
       var config = {
-        dataUrl: buildUrl + "/Build.data",
-        frameworkUrl: buildUrl + "/Build.framework.js",
-        codeUrl: buildUrl + "/Build.wasm",
+        dataUrl: buildUrl + "/docs.data",
+        frameworkUrl: buildUrl + "/docs.framework.js",
+        codeUrl: buildUrl + "/docs.wasm",
         streamingAssetsUrl: "StreamingAssets",
         companyName: "DefaultCompany",
-        productName: "test-webxr-demo",
-        productVersion: "0.1.0",
+        productName: "demo-xr-viewport",
+        productVersion: "0.1",
       };
 
       var container = document.querySelector("#unity-container");
@@ -49,8 +49,8 @@
       var unityInstance = null;
       
 
-      canvasContainer.style.width = "960px";
-      canvasContainer.style.height = "600px";
+      canvasContainer.style.width = "800px";
+      canvasContainer.style.height = "400px";
       loadingBar.style.display = "block";
 
       var script = document.createElement("script");
