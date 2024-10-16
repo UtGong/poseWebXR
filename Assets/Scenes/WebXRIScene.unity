@@ -7207,10 +7207,10 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_text: "Browser\nCamera Controls:\n- Mouse: Look around\n- WASD/Arrow Keys: Move
-    (forward, backward, left, right)\n- Movement is relative to camera direction\n\nObject
-    Manipulation:\n- Left-click to select/deselect objects\n- When object selected:\n 
-    - WASD/Arrow Keys: Move object (relative to camera view)\n  - Space/C: Move object
-    up/down\n  - Mouse: Rotate object\n"
+    (forward, backward, left, right)\n- Movement is relative to camera direction\n-
+    R key: Rotate Camera\n\nObject Manipulation:\n- Left-click to select/deselect
+    objects\n- When object selected:\n  - WASD/Arrow Keys: Move object (relative
+    to camera view)\n  - Space/C: Move object up/down\n  - Mouse: Rotate object\n"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}

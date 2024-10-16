@@ -13,6 +13,8 @@ public class CameraPCController : MonoBehaviour
     public GameObject CameraObj;
     private bool isNormalMode;
 
+    private bool isCameraRotate = false;
+
     public void ChangeNormalMode(bool _isNormalMode)
     {
         isNormalMode = _isNormalMode;
@@ -20,6 +22,10 @@ public class CameraPCController : MonoBehaviour
     
     void Update()
     {
+        if (Input.GetKeyDown(KeyCode.R))
+        {
+            isCameraRotate = !isCameraRotate;
+        }
         if (isNormalMode)
         {
             // 检测鼠标左键点击
@@ -88,10 +94,14 @@ public class CameraPCController : MonoBehaviour
             }
             else
             {
-                // 鼠标控制旋转
-                float mouseXFP = Input.GetAxis("Mouse X") * sensitivity;
-                rotationY += mouseXFP;
-                CameraObj.transform.localEulerAngles = new Vector3(0, rotationY, 0);
+                if (isCameraRotate)
+                {
+                    // 鼠标控制旋转
+                    float mouseXFP = Input.GetAxis("Mouse X") * sensitivity;
+                    rotationY += mouseXFP;
+                    CameraObj.transform.localEulerAngles = new Vector3(0, rotationY, 0);
+                }
+                
 
                 // 获取输入
                 float moveHorizontal = Input.GetAxis("Horizontal"); // A/D 或 左/右箭头
