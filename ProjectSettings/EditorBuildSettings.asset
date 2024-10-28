@@ -17,9 +17,6 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/WebXRIScene.unity
     guid: 8e9fe5a64b7b6e049832e5787af5daf2
-  - enabled: 1
-    path: Assets/Scenes/WebXRIScenea.unity
-    guid: 82bdc35e820add442bebd2d9599274f3
   m_configObjects:
     WebXR.Settings: {fileID: 11400000, guid: 590b6aa5616d5364ab8e5b2d2c7ba3d7, type: 2}
     com.unity.input.settings: {fileID: 11400000, guid: df580a1c901e1d6488b42f83b5c15620, type: 2}
