@@ -1,12 +1,9 @@
-using System.Collections.Generic;
-using System.IO;
 using UnityEngine;
 
 public class CSVDataLoader : MonoBehaviour
 {
-    private Vector3[] singleFrameData; // Array to hold joint positions for a single frame
-    [SerializeField] private string csvFileName = "fultz_j3d_0.csv"; // Name of the CSV file
-    private const int JointsCount = 35; // Number of joints expected in the single frame
+    private Vector3[] singleFrameData;
+    [SerializeField] private string csvFileName = "fultz_j3d_0"; // File name without extension
 
     void Start()
     {
@@ -15,39 +12,81 @@ public class CSVDataLoader : MonoBehaviour
 
     private void LoadCSVData()
     {
-        // Path to the file in the Resources folder
-        string filePath = Path.Combine(Application.dataPath, "Resources", csvFileName);
-
-        if (File.Exists(filePath))
+        Debug.Log("Attempting to load CSV file: " + csvFileName);
+        TextAsset csvFile = Resources.Load<TextAsset>(csvFileName);
+        
+        if (csvFile == null)
         {
-            string[] lines = File.ReadAllLines(filePath);
-            singleFrameData = new Vector3[JointsCount];
+            Debug.LogError("CSV file not found in Resources. Ensure it's located at Assets/Resources/" + csvFileName + ".csv");
+            return;
+        }
 
-            for (int jointIndex = 0; jointIndex < JointsCount && jointIndex < lines.Length; jointIndex++)
+        Debug.Log("Successfully loaded " + csvFileName + ". Content:\n" + csvFile.text);
+
+        string[] lines = csvFile.text.Split(new char[] { '\n' }, System.StringSplitOptions.RemoveEmptyEntries);
+        Debug.Log("CSV file split into " + lines.Length + " lines.");
+
+        if (lines.Length < 35)
+        {
+            Debug.LogError("CSV file does not contain enough data. Expected at least 35 lines for one frame.");
+            return;
+        }
+
+        singleFrameData = new Vector3[35];
+        for (int i = 0; i < 35; i++)
+        {
+            string line = lines[i];
+            string[] entries = line.Split(',');
+
+            if (entries.Length == 3)
             {
-                string[] entries = lines[jointIndex].Split(',');
-
-                if (entries.Length == 3)
+                if (float.TryParse(entries[0], out float x) &&
+                    float.TryParse(entries[1], out float y) &&
+                    float.TryParse(entries[2], out float z))
                 {
-                    // Parse X, Y, Z values and store them as Vector3
-                    float x = float.Parse(entries[0]);
-                    float y = float.Parse(entries[1]);
-                    float z = float.Parse(entries[2]);
-
-                    singleFrameData[jointIndex] = new Vector3(x, y, z);
+                    singleFrameData[i] = new Vector3(x, y, z);
+                    Debug.Log("Parsed joint " + i + ": " + singleFrameData[i]);
+                }
+                else
+                {
+                    Debug.LogError("Failed to parse values on line " + (i + 1) + ": " + line);
+                    singleFrameData = null;
+                    return;
                 }
             }
+            else
+            {
+                Debug.LogError("Line " + (i + 1) + " does not have exactly 3 entries: " + line);
+                singleFrameData = null;
+                return;
+            }
+        }
 
-            Debug.Log("CSV Data Loaded Successfully for a single frame with " + singleFrameData.Length + " joints.");
+        if (singleFrameData != null && singleFrameData.Length == 35)
+        {
+            Debug.Log("CSV data loaded successfully with 35 joints.");
         }
         else
         {
-            Debug.LogError("CSV file not found at path: " + filePath);
+            Debug.LogError("singleFrameData array was not set correctly after parsing.");
         }
     }
 
     public Vector3[] GetSingleFrameData()
     {
+        if (singleFrameData == null || singleFrameData.Length == 0)
+        {
+            Debug.LogError("singleFrameData is null or empty when accessed.");
+        }
+        else
+        {
+            Debug.Log("singleFrameData accessed successfully with " + singleFrameData.Length + " joints.");
+            for (int i = 0; i < singleFrameData.Length; i++)
+            {
+                Debug.Log($"Joint {i} data: {singleFrameData[i]}");
+            }
+        }
+
         return singleFrameData;
     }
 }
