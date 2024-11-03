@@ -4,17 +4,15 @@ using UnityEngine;
 
 public class CSVDataLoader : MonoBehaviour
 {
-    // Data structure to hold joint positions for each frame
-    private List<Vector3[]> framesData = new List<Vector3[]>();
-
+    private Vector3[] singleFrameData; // Array to hold joint positions for a single frame
     [SerializeField] private string csvFileName = "fultz_j3d_0.csv"; // Name of the CSV file
+    private const int JointsCount = 35; // Number of joints expected in the single frame
 
     void Start()
     {
         LoadCSVData();
     }
 
-    // Function to load CSV data
     private void LoadCSVData()
     {
         // Path to the file in the Resources folder
@@ -23,32 +21,24 @@ public class CSVDataLoader : MonoBehaviour
         if (File.Exists(filePath))
         {
             string[] lines = File.ReadAllLines(filePath);
+            singleFrameData = new Vector3[JointsCount];
 
-            foreach (string line in lines)
+            for (int jointIndex = 0; jointIndex < JointsCount && jointIndex < lines.Length; jointIndex++)
             {
-                string[] entries = line.Split(',');
+                string[] entries = lines[jointIndex].Split(',');
 
                 if (entries.Length == 3)
                 {
-                    // Create a Vector3 array for each frame
-                    Vector3[] jointPositions = new Vector3[entries.Length / 3];
+                    // Parse X, Y, Z values and store them as Vector3
+                    float x = float.Parse(entries[0]);
+                    float y = float.Parse(entries[1]);
+                    float z = float.Parse(entries[2]);
 
-                    for (int i = 0; i < entries.Length; i += 3)
-                    {
-                        // Parse X, Y, Z values and store them as Vector3
-                        float x = float.Parse(entries[i]);
-                        float y = float.Parse(entries[i + 1]);
-                        float z = float.Parse(entries[i + 2]);
-
-                        jointPositions[i / 3] = new Vector3(x, y, z);
-                    }
-
-                    // Add this frame's data to framesData list
-                    framesData.Add(jointPositions);
+                    singleFrameData[jointIndex] = new Vector3(x, y, z);
                 }
             }
 
-            Debug.Log("CSV Data Loaded Successfully. Total Frames: " + framesData.Count);
+            Debug.Log("CSV Data Loaded Successfully for a single frame with " + singleFrameData.Length + " joints.");
         }
         else
         {
@@ -56,15 +46,8 @@ public class CSVDataLoader : MonoBehaviour
         }
     }
 
-    // Method to retrieve data for each frame (useful for later)
-    public Vector3[] GetFrameData(int frameIndex)
+    public Vector3[] GetSingleFrameData()
     {
-        if (frameIndex >= 0 && frameIndex < framesData.Count)
-        {
-            return framesData[frameIndex];
-        }
-
-        Debug.LogError("Frame index out of range");
-        return null;
+        return singleFrameData;
     }
 }

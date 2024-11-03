@@ -6,54 +6,70 @@ public class JointAnimator : MonoBehaviour
 {
     public CSVDataLoader csvDataLoader; // Reference to the CSV data loader script
     public JointMapper jointMapper;     // Reference to the joint mapper script
-    public float frameRate = 30f;       // Frames per second for applying data
-
-    private int currentFrame = 0;
-    private float timeSinceLastFrame = 0f;
+    public float positionScale = 100f;  // Adjust this scale factor for visibility
 
     void Start()
     {
-        // Verify that the CSVDataLoader and JointMapper references are assigned
+        Debug.Log("JointAnimator Start method called."); // Confirm Start method is executing
+
+        // Check and confirm references to csvDataLoader and jointMapper
         if (csvDataLoader == null || jointMapper == null)
         {
             Debug.LogError("CSVDataLoader or JointMapper references are missing.");
             enabled = false;
             return;
         }
+        Debug.Log("CSVDataLoader and JointMapper references are assigned.");
+
+        // Attempt to apply the single frame data to the FBX model
+        ApplySingleFrameData();
     }
 
-    void Update()
+    private void ApplySingleFrameData()
     {
-        // Update frame based on the frame rate
-        timeSinceLastFrame += Time.deltaTime;
-        if (timeSinceLastFrame >= 1f / frameRate)
+        Debug.Log("ApplySingleFrameData called"); // Confirm function is executing
+
+        // Retrieve single frame data
+        Vector3[] frameData = csvDataLoader.GetSingleFrameData();
+
+        // Check if frameData is loaded correctly
+        if (frameData == null)
         {
-            ApplyFrameData(currentFrame);
-            currentFrame = (currentFrame + 1) % csvDataLoader.framesData.Count; // Loop back to start if at end
-            timeSinceLastFrame = 0f;
+            Debug.LogError("Frame data is null. Check if CSV file is loading correctly in CSVDataLoader.");
+            return;
         }
-    }
-
-    private void ApplyFrameData(int frameIndex)
-    {
-        Vector3[] frameData = csvDataLoader.GetFrameData(frameIndex);
-
-        if (frameData == null) return;
+        else if (frameData.Length == 0)
+        {
+            Debug.LogWarning("Frame data is empty. Ensure CSV file has data for at least one frame.");
+            return;
+        }
+        
+        Debug.Log("Frame data loaded with " + frameData.Length + " joints."); // Confirm data length
 
         // Apply joint positions to the FBX model using the joint mapping
-        foreach (var jointIndex in jointMapper.jointMapping.Keys)
+        foreach (var jointIndex in jointMapper.GetJointMapping().Keys)
         {
             Transform jointTransform = jointMapper.GetJointTransform(jointIndex);
 
-            if (jointTransform != null)
+            if (jointTransform != null && jointIndex < frameData.Length)
             {
-                // Update the local position or rotation of the joint based on the CSV data
-                jointTransform.localPosition = frameData[jointIndex];
+                // Log original position before applying new data
+                Vector3 originalPosition = jointTransform.localPosition;
+                Debug.Log("Joint " + jointIndex + " original position: " + originalPosition);
 
-                // If you need to apply rotation, convert the Vector3 data to Quaternion
-                // Uncomment the line below if your data represents rotation in Euler angles
-                // jointTransform.localRotation = Quaternion.Euler(frameData[jointIndex]);
+                // Scale up the position data for visibility and apply it
+                Vector3 newPosition = frameData[jointIndex] * positionScale;
+                jointTransform.localPosition = newPosition;
+
+                // Log new position after applying the data
+                Debug.Log("Joint " + jointIndex + " new position: " + jointTransform.localPosition + ", based on CSV data: " + frameData[jointIndex]);
+            }
+            else
+            {
+                Debug.LogWarning("No transform found for joint index: " + jointIndex);
             }
         }
+
+        Debug.Log("Applied pose data from single frame.");
     }
 }
