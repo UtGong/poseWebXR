@@ -465,7 +465,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0394ca5b728a744279cb8e3c4459f6fc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  csvFileName: fultz_j3d_0.csv
+  csvFileName: fultz_j3d_0
 --- !u!4 &1114425921
 Transform:
   m_ObjectHideFlags: 0
@@ -542,6 +542,10 @@ PrefabInstance:
     - target: {fileID: -8679921383154817045, guid: b2956abf98a144a64907862e018e7d36, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -7121769801107515815, guid: b2956abf98a144a64907862e018e7d36, type: 3}
+      propertyPath: m_IsActive
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: b2956abf98a144a64907862e018e7d36, type: 3}
       propertyPath: m_Name
