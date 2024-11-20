@@ -187,7 +187,7 @@ namespace WebXR.Interactions.Samples.XRInteractionToolkit.Editor
             if (request.Status == StatusCode.Success && request.Result.Length > 0)
             {
                 var versions = request.Result[0].versions;
-                var verifiedVersion = new PackageVersion(versions.recommended);
+                var verifiedVersion = new PackageVersion(versions.verified);
                 var latestCompatible = new PackageVersion(versions.latestCompatible);
                 if (verifiedVersion < s_RecommendedHandsPackageVersion && s_RecommendedHandsPackageVersion <= latestCompatible)
                     addRequest = $"{k_HandsPackageName}@{s_RecommendedHandsPackageVersion}";
@@ -218,7 +218,7 @@ namespace WebXR.Interactions.Samples.XRInteractionToolkit.Editor
             if (request.Status == StatusCode.Success && request.Result.Length > 0)
             {
                 var versions = request.Result[0].versions;
-                var verifiedVersion = new PackageVersion(versions.recommended);
+                var verifiedVersion = new PackageVersion(versions.verified);
                 var latestCompatible = new PackageVersion(versions.latestCompatible);
                 if (verifiedVersion < s_MinimumXRIPackageVersion && s_MinimumXRIPackageVersion <= latestCompatible)
                     addRequest = $"{k_XRIPackageName}@{s_MinimumXRIPackageVersion}";

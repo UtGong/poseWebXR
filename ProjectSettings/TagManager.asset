@@ -6,6 +6,12 @@ TagManager:
   tags:
   - CameraMarker
   - CameraHandle
+  - CameraSet_1
+  - CameraSet_2
+  - CameraSet_3
+  - CameraSet_4
+  - CameraSet_5
+  - CameraSet_0
   layers:
   - Default
   - TransparentFX
@@ -17,17 +23,17 @@ TagManager:
   - ModelLayer_1
   - ModelLayer_2
   - CameraMarker
-  - 
-  - 
-  - 
-  - 
-  - 
-  - 
-  - 
-  - 
-  - 
-  - 
-  - 
+  - modelMainset
+  - modelAdd1set
+  - modelAdd2set
+  - modelAdd3set
+  - layer5
+  - layer6
+  - layer7
+  - layer8
+  - layer9
+  - layer10
+  - layer11
   - 
   - 
   - 
