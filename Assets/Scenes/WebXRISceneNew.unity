@@ -1610,6 +1610,11 @@ RectTransform:
   m_AnchoredPosition: {x: 41.75, y: -35}
   m_SizeDelta: {x: 283.5, y: 72.3}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!4 &469991350 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 8454827066901264282, guid: 416d779b8474d4775ba031bd2ba2f4f0, type: 3}
+  m_PrefabInstance: {fileID: 6713787137390295382}
+  m_PrefabAsset: {fileID: 0}
 --- !u!95 &504406678 stripped
 Animator:
   m_CorrespondingSourceObject: {fileID: 5866666021909216657, guid: b2956abf98a144a64907862e018e7d36, type: 3}
@@ -1941,6 +1946,66 @@ Camera:
   m_OcclusionCulling: 1
   m_StereoConvergence: 10
   m_StereoSeparation: 0.022
+--- !u!1 &559365592
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 559365594}
+  - component: {fileID: 559365596}
+  - component: {fileID: 559365595}
+  m_Layer: 0
+  m_Name: MotionSelectionController
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &559365594
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 559365592}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 20.438854, y: 8.922338, z: 16.798832}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_RootOrder: 17
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &559365595
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 559365592}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e30d34068881c934ca0a1152d528b3d3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &559365596
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 559365592}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 132ac3ab9697d3f4aad5c83d8def27f9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  staticPoses: []
+  selectedPose1: {fileID: 0}
+  selectedPose2: {fileID: 0}
 --- !u!1 &578358146
 GameObject:
   m_ObjectHideFlags: 0
@@ -1953,7 +2018,7 @@ GameObject:
   - component: {fileID: 578358148}
   - component: {fileID: 578358147}
   m_Layer: 0
-  m_Name: Visualizer-XBot1
+  m_Name: Visualizer-carmelo
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1971,17 +2036,18 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9c50991cc0c9849f28a8a2e7447fc8d6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  animationClip: {fileID: -203655887218126122, guid: a901fb62e090df04f8f5c06d44deae2d, type: 3}
+  animationClip: {fileID: 760175408958997813, guid: b647bfe35edca7e4e888248898a3bd14, type: 3}
   characterPrefab: {fileID: 788524867}
-  jointToTrack: {fileID: 1545930789}
-  mainJoint: {fileID: 1545930789}
-  adjacentJoint1: {fileID: 1218487228}
-  adjacentJoint2: {fileID: 1096283893}
+  jointToTrack: {fileID: 1440898956}
+  mainJoint: {fileID: 1440898956}
+  adjacentJoint1: {fileID: 1743051663}
+  adjacentJoint2: {fileID: 469991350}
   rowStartPosition: {x: -1.42, y: 4, z: 0}
   spacing: 2
-  frameInterval: 0.6
+  frameInterval: 0.1
   secondRowOffset: -1
   visualizationRange: 1
+  rotationOffset: {x: 180, y: 0, z: 0}
 --- !u!114 &578358148
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3164,11 +3230,6 @@ RectTransform:
   m_AnchoredPosition: {x: -850, y: 0}
   m_SizeDelta: {x: 160, y: 30}
   m_Pivot: {x: 0.5, y: 0.5}
---- !u!4 &1096283893 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: -2770666803903516498, guid: b2956abf98a144a64907862e018e7d36, type: 3}
-  m_PrefabInstance: {fileID: 1142152084}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1109527349
 GameObject:
   m_ObjectHideFlags: 0
@@ -3622,7 +3683,7 @@ PrefabInstance:
     - target: {fileID: 5866666021909216657, guid: b2956abf98a144a64907862e018e7d36, type: 3}
       propertyPath: m_Controller
       value: 
-      objectReference: {fileID: 9100000, guid: bc1b49cc6ffb10c44969a34c619d8369, type: 2}
+      objectReference: {fileID: 9100000, guid: e6e5527937a45214fac5d8b2dcb6bae7, type: 2}
     - target: {fileID: 5866666021909216657, guid: b2956abf98a144a64907862e018e7d36, type: 3}
       propertyPath: m_WarningMessage
       value: 
@@ -4079,11 +4140,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1209458888}
   m_CullTransparentMesh: 1
---- !u!4 &1218487228 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: -2072040086291044643, guid: b2956abf98a144a64907862e018e7d36, type: 3}
-  m_PrefabInstance: {fileID: 1142152084}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1219092116
 GameObject:
   m_ObjectHideFlags: 0
@@ -5049,7 +5105,7 @@ GameObject:
   - component: {fileID: 1383956019}
   - component: {fileID: 1383956021}
   m_Layer: 0
-  m_Name: Visualizer-XBot
+  m_Name: Visualizer-kd
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -5095,21 +5151,22 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9c50991cc0c9849f28a8a2e7447fc8d6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  animationClip: {fileID: -203655887218126122, guid: ff6ea7a8637e89141aa1ba61ee98dd82, type: 3}
+  animationClip: {fileID: 6253875063010543980, guid: 0bfba06823806b546a6a6a8bc0ce4586, type: 3}
   characterPrefab: {fileID: 788524867}
-  jointToTrack: {fileID: 1819828006}
-  mainJoint: {fileID: 1819828006}
-  adjacentJoint1: {fileID: 1758396144}
-  adjacentJoint2: {fileID: 1399194911}
-  rowStartPosition: {x: -1.42, y: 5.77, z: 0}
+  jointToTrack: {fileID: 1440898956}
+  mainJoint: {fileID: 1440898956}
+  adjacentJoint1: {fileID: 1743051663}
+  adjacentJoint2: {fileID: 469991350}
+  rowStartPosition: {x: -1.42, y: 6.5, z: 0}
   spacing: 2
-  frameInterval: 0.6
+  frameInterval: 0.15
   secondRowOffset: -1
   visualizationRange: 1
---- !u!4 &1399194911 stripped
+  rotationOffset: {x: 180, y: 0, z: 0}
+--- !u!4 &1440898956 stripped
 Transform:
-  m_CorrespondingSourceObject: {fileID: -2770666803903516498, guid: b2956abf98a144a64907862e018e7d36, type: 3}
-  m_PrefabInstance: {fileID: 1758396143}
+  m_CorrespondingSourceObject: {fileID: 6151099878384617294, guid: 416d779b8474d4775ba031bd2ba2f4f0, type: 3}
+  m_PrefabInstance: {fileID: 6713787137390295382}
   m_PrefabAsset: {fileID: 0}
 --- !u!1 &1461222889
 GameObject:
@@ -5543,11 +5600,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1541456134}
   m_CullTransparentMesh: 1
---- !u!4 &1545930789 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: -6874584590210671055, guid: b2956abf98a144a64907862e018e7d36, type: 3}
-  m_PrefabInstance: {fileID: 1142152084}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1560824268
 GameObject:
   m_ObjectHideFlags: 0
@@ -6068,6 +6120,11 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1726884660}
   m_CullTransparentMesh: 1
+--- !u!4 &1743051663 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 1238193162943786984, guid: 416d779b8474d4775ba031bd2ba2f4f0, type: 3}
+  m_PrefabInstance: {fileID: 6713787137390295382}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1001 &1758396143
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -6362,7 +6419,7 @@ PrefabInstance:
     - target: {fileID: 5866666021909216657, guid: b2956abf98a144a64907862e018e7d36, type: 3}
       propertyPath: m_Controller
       value: 
-      objectReference: {fileID: 9100000, guid: 6278cf170a9f9b1459c1dd84c728da9e, type: 2}
+      objectReference: {fileID: 9100000, guid: 6971c7d3b4e0fda4eb0b14a0f584157e, type: 2}
     - target: {fileID: 5866666021909216657, guid: b2956abf98a144a64907862e018e7d36, type: 3}
       propertyPath: m_WarningMessage
       value: 
@@ -6568,11 +6625,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1786822008}
   m_CullTransparentMesh: 1
---- !u!4 &1819828006 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: -6874584590210671055, guid: b2956abf98a144a64907862e018e7d36, type: 3}
-  m_PrefabInstance: {fileID: 1758396143}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1865620427
 GameObject:
   m_ObjectHideFlags: 0
@@ -7639,6 +7691,10 @@ PrefabInstance:
     - target: {fileID: 578412474374411705, guid: 416d779b8474d4775ba031bd2ba2f4f0, type: 3}
       propertyPath: m_IsActive
       value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 884601623546059939, guid: 416d779b8474d4775ba031bd2ba2f4f0, type: 3}
+      propertyPath: m_Controller
+      value: 
       objectReference: {fileID: 0}
     - target: {fileID: 5230163759244381577, guid: 416d779b8474d4775ba031bd2ba2f4f0, type: 3}
       propertyPath: m_IsActive

@@ -12,6 +12,7 @@ TagManager:
   - CameraSet_4
   - CameraSet_5
   - CameraSet_0
+  - StaticPose
   layers:
   - Default
   - TransparentFX
