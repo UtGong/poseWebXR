@@ -1,189 +1,51 @@
-// using UnityEngine;
-// using UnityEngine.UI;
-// using System.Collections.Generic;
-
-// public class CameraManager : MonoBehaviour
-// {
-//     public GameObject mainModel; // Assign the main model in the Inspector
-//     public GameObject[] additionalModels; // Assign additional models in the Inspector (at most 3)
-//     public Button linkedButton; // Assign the linked button in the Inspector
-
-//     private Camera displayCamera; // The camera used for display
-//     private int cameraSetCounter = 0; // Tracks the number of camera sets added
-
-//     private class CameraSet
-//     {
-//         public Camera mainCamera;
-//         public List<GameObject> additionalCameras = new List<GameObject>();
-//         public List<GameObject> associatedModels = new List<GameObject>();
-//         public string tag; // Tag for this camera set
-//     }
-
-//     private List<CameraSet> cameraSets = new List<CameraSet>(); // Track all camera sets
-
-//     void Start()
-//     {
-//         // Attempt to find the active camera
-//         displayCamera = Camera.main; // Get the camera tagged as "MainCamera"
-
-//         // If no camera is tagged as "MainCamera," find any enabled camera
-//         if (displayCamera == null)
-//         {
-//             Camera[] allCameras = FindObjectsOfType<Camera>();
-//             foreach (Camera cam in allCameras)
-//             {
-//                 if (cam.enabled)
-//                 {
-//                     displayCamera = cam;
-//                     break;
-//                 }
-//             }
-//         }
-
-//         // Handle case where no active camera is found
-//         if (displayCamera == null)
-//         {
-//             Debug.LogError("No active camera found at start! Please ensure there is an enabled camera in the scene.");
-//         }
-//         else
-//         {
-//             Debug.Log("Active camera detected: " + displayCamera.name);
-//         }
-
-//         // Link the button's click event to create cameras
-//         linkedButton.onClick.AddListener(CreateCameras);
-//     }
-
-//     void CreateCameras()
-//     {
-//         if (cameraSetCounter >= 5) return; // Limit to 5 camera sets
-
-//         // Create a new camera set
-//         CameraSet newSet = new CameraSet();
-//         newSet.tag = "CameraSet_" + cameraSetCounter;
-
-//         // Create the main camera for the main model (do NOT make it the display camera)
-//         GameObject mainCameraObj = CreateCamera("camera_mainModel_" + cameraSetCounter, mainModel, "modelMainset", newSet.tag);
-//         newSet.mainCamera = mainCameraObj.GetComponent<Camera>();
-
-//         // Create cameras for additional models
-//         for (int i = 0; i < additionalModels.Length; i++)
-//         {
-//             GameObject additionalCamera = CreateCamera(
-//                 "camera_add" + (i + 1) + "_" + cameraSetCounter,
-//                 additionalModels[i],
-//                 "modelAdd" + (i + 1) + "set",
-//                 newSet.tag
-//             );
-//             newSet.additionalCameras.Add(additionalCamera);
-//             newSet.associatedModels.Add(additionalModels[i]);
-//         }
-
-//         cameraSets.Add(newSet);
-//         cameraSetCounter++;
-//     }
-
-//     GameObject CreateCamera(string cameraName, GameObject model, string layer, string tag)
-//     {
-//         GameObject newCamera = new GameObject(cameraName);
-//         newCamera.tag = tag; // Assign the tag to group cameras in the same set
-
-//         Camera cameraComponent = newCamera.AddComponent<Camera>();
-//         cameraComponent.cullingMask = 1 << LayerMask.NameToLayer(layer);
-
-//         // Disable the new camera's display capability
-//         cameraComponent.enabled = false;
-
-//         // Position and rotate the camera relative to the model
-//         Transform modelTransform = model.transform;
-//         Vector3 relativePosition = new Vector3(0, 5, -10); // Adjust as needed
-//         Quaternion relativeRotation = Quaternion.Euler(15, 0, 0); // Adjust as needed
-
-//         newCamera.transform.position = modelTransform.position + modelTransform.TransformDirection(relativePosition);
-//         newCamera.transform.rotation = modelTransform.rotation * relativeRotation;
-
-//         // Add debug visual (optional)
-//         AddDebugColor(newCamera, layer == "modelMainset" ? Color.red : Color.blue);
-
-//         return newCamera;
-//     }
-
-//     void AddDebugColor(GameObject cameraObject, Color color)
-//     {
-//         // Adds a sphere to represent the camera for debugging purposes
-//         GameObject debugMarker = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-//         debugMarker.transform.SetParent(cameraObject.transform);
-//         debugMarker.transform.localPosition = Vector3.zero;
-//         debugMarker.transform.localScale = Vector3.one; // Sphere size 1, 1, 1
-
-//         Renderer renderer = debugMarker.GetComponent<Renderer>();
-//         renderer.material.color = color;
-//     }
-
-//     void Update()
-//     {
-//         // Iterate through all camera sets and update them
-//         foreach (var cameraSet in cameraSets)
-//         {
-//             Camera mainCamera = cameraSet.mainCamera;
-//             if (mainCamera == null) continue;
-
-//             Vector3 relativePosition = mainCamera.transform.position - mainModel.transform.position;
-//             Quaternion relativeRotation = Quaternion.Inverse(mainModel.transform.rotation) * mainCamera.transform.rotation;
-
-//             for (int i = 0; i < cameraSet.associatedModels.Count; i++)
-//             {
-//                 GameObject model = cameraSet.associatedModels[i];
-//                 GameObject additionalCamera = cameraSet.additionalCameras[i];
-
-//                 additionalCamera.transform.position = model.transform.position + relativePosition;
-//                 additionalCamera.transform.rotation = model.transform.rotation * relativeRotation;
-//             }
-//         }
-//     }
-// }
-
-
 using UnityEngine;
 using UnityEngine.UI;
 using System.Collections.Generic;
+using UnityEngine.SceneManagement;
 
 public class CameraManager : MonoBehaviour
 {
-    public GameObject mainModel; // Assign the main model in the Inspector
-    public GameObject[] additionalModels; // Assign additional models in the Inspector (at most 3)
     public Button linkedButton; // Assign the linked button in the Inspector
     public Canvas canvas; // Assign the UI Canvas in the Inspector
 
     private Camera displayCamera; // The camera used for display
     private int cameraSetCounter = 0; // Tracks the number of camera sets added
+    private GameObject mainModel; // Dynamically assigned from pose1Name
+    private GameObject additionalModel; // Dynamically assigned from pose2Name
 
+    private Camera activeCamera; // The currently active camera for movement
+    private bool isDragging = false; // Flag to track dragging state
+    private Vector3 lastMousePosition; // To track the last mouse position for rotation
+
+    private readonly Vector3[] defaultCameraPositions = {
+        new Vector3(-0.75f, 3.70f, 1.35f),
+        new Vector3(-1.68f, 3.55f, 0.19f),
+        new Vector3(-0.55f, 3.61f, -0.97f)
+    };
+
+    private readonly Vector3[] defaultCameraRotations = {
+        new Vector3(0, -179f, 0),
+        new Vector3(0, 102.3f, 0),
+        new Vector3(0, 0, 0)
+    };
+
+    // Colors for each camera set
+    private readonly Color[] cameraSetColors = {
+    Color.green, Color.blue, Color.red, Color.yellow, Color.magenta
+    };
+    
     private class CameraSet
     {
         public Camera mainCamera;
-        public List<GameObject> additionalCameras = new List<GameObject>();
-        public List<GameObject> associatedModels = new List<GameObject>();
+        public Camera additionalCamera;
+        public GameObject associatedModel;
         public string tag; // Tag for this camera set
-        public List<RenderTexture> renderTextures = new List<RenderTexture>(); // RenderTextures for camera views
+        public RenderTexture mainRenderTexture; // RenderTexture for main camera
+        public RenderTexture additionalRenderTexture; // RenderTexture for additional camera
     }
 
+
     private List<CameraSet> cameraSets = new List<CameraSet>(); // Track all camera sets
-
-    private Vector3[] predefinedPositions = new Vector3[]
-{
-    new Vector3(-0.48f, 0.96f, -0.79f), // Set 0
-    new Vector3(-1.81f, 0.89f, -0.16f), // Set 1
-    new Vector3(0.57f, 0.85f, 0.39f),   // Set 2
-    new Vector3(-0.71f, 0.76f, 1.33f)   // Set 3
-};
-
-    private Vector3[] predefinedRotations = new Vector3[]
-    {
-    new Vector3(15f, -9.577f, 0f),      // Set 0
-    new Vector3(15f, 68.85f, 0f),       // Set 1
-    new Vector3(15f, 269.9f, 0f),       // Set 2
-    new Vector3(15f, 533.8f, 0f)        // Set 3
-    };
 
     void Start()
     {
@@ -202,113 +64,353 @@ public class CameraManager : MonoBehaviour
             }
         }
 
-        if (displayCamera == null)
-        {
-            Debug.LogError("No active camera found at start! Please ensure there is an enabled camera in the scene.");
-        }
-        else
-        {
-            Debug.Log("Active camera detected: " + displayCamera.name);
-        }
-
         // Link the button's click event to create cameras
         linkedButton.onClick.AddListener(CreateCameras);
     }
 
-    void CreateCameras()
+    public void UpdateSelectedPoseNames(string pose1Name, string pose2Name)
     {
-        if (cameraSetCounter >= 5) return; // Limit to 5 camera sets
+        // Search for mainModel and additionalModel dynamically based on pose names
+        mainModel = FindModelByNameAndLayer(pose1Name, "modelMainset");
+        additionalModel = FindModelByNameAndLayer(pose2Name, "modelAdd1set");
+
+        Debug.Log("-------------MainModel: " + mainModel);
+        Debug.Log("-------------AdditionalModel: " + additionalModel);
+
+        if (mainModel != null && additionalModel != null)
+        {
+            // Adjust the cameras to ensure the distance and rotation between cameras and poses are synchronized
+            foreach (var cameraSet in cameraSets)
+            {
+                Camera mainCamera = cameraSet.mainCamera;
+                Camera additionalCamera = cameraSet.additionalCamera;
+
+                if (mainCamera != null && additionalCamera != null)
+                {
+                    // Get the "mixamorig:Hips" transform for both models
+                    Transform mainHipsTransform = mainModel.transform.Find("mixamorig:Hips");
+                    Transform additionalHipsTransform = additionalModel.transform.Find("mixamorig:Hips");
+
+                    if (mainHipsTransform != null && additionalHipsTransform != null)
+                    {
+                        // Calculate the distance between the main camera and the main pose
+                        float mainCameraDistance = Vector3.Distance(mainCamera.transform.position, mainHipsTransform.position);
+
+                        // Adjust the additional camera's position and rotation to match the main camera's relation to the main pose
+                        Vector3 direction = (mainCamera.transform.position - mainHipsTransform.position).normalized;
+                        additionalCamera.transform.position = additionalHipsTransform.position + direction * mainCameraDistance;
+
+                        // Match the rotation of the main camera
+                        additionalCamera.transform.rotation = mainCamera.transform.rotation;
+                    }
+                    else
+                    {
+                        Debug.LogWarning("Hips transform not found on one or both models.");
+                    }
+                }
+            }
+        }
+        else
+        {
+            Debug.LogWarning("[CameraManager] Main or Additional model not found!");
+        }
+    }
+
+    private GameObject FindModelByNameAndLayer(string modelName, string layerName)
+    {
+        int layer = LayerMask.NameToLayer(layerName);
+        if (layer == -1)
+        {
+            Debug.LogError($"Layer '{layerName}' not found. Ensure it is defined in the project settings.");
+            return null;
+        }
+        Debug.Log($"Looking for '{modelName}' in layer '{layerName}'...");
+
+        // Find the Canvas using recursive search
+        GameObject canvasObject = FindCanvasByName("CanvasResult");
+        if (canvasObject == null)
+        {
+            Debug.LogError("Canvas 'CanvasResult' not found.");
+            return null;
+        }
+
+        // Find the 'MotionParent' under the Canvas
+        Transform motionParent = canvasObject.transform.Find("MotionParent");
+        if (motionParent == null)
+        {
+            Debug.LogError("MotionParent not found under the Canvas!");
+            return null;
+        }
+
+        // Find the object by name under the MotionParent
+        Transform objectTransform = motionParent.Find(modelName);
+        if (objectTransform != null)
+        {
+            GameObject obj = objectTransform.gameObject;
+
+            // Check if the object is in the correct layer and matches the model name
+            if (obj.layer == layer && obj.name == modelName)
+            {
+                Debug.Log($"[CameraManager] Found object: {obj.name} in layer: {layerName}");
+                return obj; // Return the GameObject
+            }
+            else
+            {
+                Debug.Log($"Object found, but does not match layer or name: {obj.name}");
+            }
+        }
+        else
+        {
+            Debug.Log("Object not found under the Canvas!");
+        }
+
+        return null; // No matching object found
+    }
+
+    private GameObject FindCanvasByName(string canvasName)
+    {
+        // Find all root objects in the scene (including inactive ones)
+        GameObject[] rootObjects = SceneManager.GetActiveScene().GetRootGameObjects();
+
+        foreach (GameObject rootObject in rootObjects)
+        {
+            // Traverse through the hierarchy of each root object
+            GameObject foundCanvas = FindCanvasInChildren(rootObject.transform, canvasName);
+            if (foundCanvas != null)
+            {
+                return foundCanvas;
+            }
+        }
+
+        return null;
+    }
+
+    private GameObject FindCanvasInChildren(Transform parent, string canvasName)
+    {
+        // Check if the current object matches the desired name
+        if (parent.gameObject.name == canvasName)
+        {
+            return parent.gameObject;
+        }
+
+        // Recursively check all children of the parent
+        foreach (Transform child in parent)
+        {
+            GameObject found = FindCanvasInChildren(child, canvasName);
+            if (found != null)
+            {
+                return found;
+            }
+        }
+
+        return null;
+    }
+
+    Bounds CalculateBounds(GameObject model)
+    {
+        Renderer[] renderers = model.GetComponentsInChildren<Renderer>();
+        if (renderers.Length == 0)
+        {
+            return new Bounds(model.transform.position, Vector3.one);
+        }
+
+        Bounds bounds = renderers[0].bounds;
+        foreach (Renderer renderer in renderers)
+        {
+            bounds.Encapsulate(renderer.bounds);
+        }
+
+        return bounds;
+    }
+
+    void HandleCameraInput()
+    {
+        if (activeCamera == null) return;
+
+        float moveSpeed = 2f;
+        float rotationSpeed = 0.2f; // Speed for rotation
+        float scrollSpeed = 2f;
+
+        // Move the camera using WASD for X and Y movement
+        if (Input.GetKey(KeyCode.W)) activeCamera.transform.position += Vector3.up * moveSpeed * Time.deltaTime;
+        if (Input.GetKey(KeyCode.S)) activeCamera.transform.position += Vector3.down * moveSpeed * Time.deltaTime;
+        if (Input.GetKey(KeyCode.A)) activeCamera.transform.position += Vector3.left * moveSpeed * Time.deltaTime;
+        if (Input.GetKey(KeyCode.D)) activeCamera.transform.position += Vector3.right * moveSpeed * Time.deltaTime;
+
+        // Move the camera using Q and E for Z-axis movement
+        if (Input.GetKey(KeyCode.Q)) activeCamera.transform.position += Vector3.forward * scrollSpeed * Time.deltaTime;
+        if (Input.GetKey(KeyCode.E)) activeCamera.transform.position += Vector3.back * scrollSpeed * Time.deltaTime;
+
+        // Rotate the camera by dragging the mouse
+        if (Input.GetMouseButtonDown(1)) // Right mouse button
+        {
+            isDragging = true;
+            lastMousePosition = Input.mousePosition;
+        }
+
+        if (Input.GetMouseButtonUp(1)) // Release right mouse button
+        {
+            isDragging = false;
+        }
+
+        if (isDragging)
+        {
+            Vector3 mouseDelta = Input.mousePosition - lastMousePosition; // Difference in mouse movement
+            lastMousePosition = Input.mousePosition;
+
+            // Rotate around the model
+            if (mainModel != null)
+            {
+                Transform mainHipsTransform = mainModel.transform.Find("mixamorig:Hips");
+                if (mainHipsTransform != null)
+                {
+                    // Horizontal drag rotates around the Y-axis (up)
+                    activeCamera.transform.RotateAround(mainHipsTransform.position, Vector3.up, mouseDelta.x * rotationSpeed);
+
+                    // Vertical drag rotates around the camera's local X-axis (pitch)
+                    activeCamera.transform.RotateAround(mainHipsTransform.position, activeCamera.transform.right, -mouseDelta.y * rotationSpeed);
+                }
+            }
+        }
+    }
+
+    void UpdateAdditionalCameras()
+    {
+        foreach (var cameraSet in cameraSets)
+        {
+            if (cameraSet.mainCamera == activeCamera)
+            {
+                // Get the hips transform for the models
+                Transform mainHipsTransform = mainModel.transform.Find("mixamorig:Hips");
+                Transform additionalHipsTransform = additionalModel.transform.Find("mixamorig:Hips");
+
+                if (mainHipsTransform == null || additionalHipsTransform == null)
+                {
+                    Debug.LogWarning("Hips transform not found on one or both models.");
+                    continue;
+                }
+
+                // Calculate the distance between the main camera and the main model's hips
+                float mainCameraDistance = Vector3.Distance(cameraSet.mainCamera.transform.position, mainHipsTransform.position);
+
+                // Update the additional camera's position relative to the additional model's hips
+                Vector3 direction = (cameraSet.mainCamera.transform.position - mainHipsTransform.position).normalized;
+                cameraSet.additionalCamera.transform.position = additionalHipsTransform.position + direction * mainCameraDistance;
+
+                // Match the rotation of the main camera
+                cameraSet.additionalCamera.transform.rotation = cameraSet.mainCamera.transform.rotation;
+            }
+        }
+    }
+
+    void DetectCameraSelection()
+    {
+        if (Input.GetMouseButtonDown(0)) // Left mouse button
+        {
+            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+            if (Physics.Raycast(ray, out RaycastHit hit))
+            {
+                foreach (var cameraSet in cameraSets)
+                {
+                    if (hit.collider.gameObject == cameraSet.mainCamera.gameObject)
+                    {
+                        activeCamera = cameraSet.mainCamera;
+                        Debug.Log($"Active camera set to: {activeCamera.name}");
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
+    public void CreateCameras()
+    {
+        if (cameraSetCounter >= cameraSetColors.Length) return; // Limit to the number of predefined colors
 
         // Create a new camera set
         CameraSet newSet = new CameraSet();
         newSet.tag = "CameraSet_" + cameraSetCounter;
 
+        // Get the unique color for this camera set
+        Color setColor = cameraSetColors[cameraSetCounter];
+
         // Create the main camera for the main model
-        GameObject mainCameraObj = CreateCamera("camera_mainModel_" + cameraSetCounter, mainModel, "modelMainset", newSet.tag);
+        GameObject mainCameraObj = CreateCamera("camera_mainModel_" + cameraSetCounter, mainModel, "modelMainset", newSet.tag, setColor, isMain: true);
         newSet.mainCamera = mainCameraObj.GetComponent<Camera>();
-        newSet.renderTextures.Add(CreateRawImageForCamera(newSet.mainCamera, "Main Model View", cameraSetCounter, 0));
+        newSet.mainRenderTexture = CreateRawImageForCamera(newSet.mainCamera, "Main Model View", cameraSetCounter, 0, setColor);
 
-        // Create cameras for additional models
-        for (int i = 0; i < additionalModels.Length; i++)
-        {
-            GameObject additionalCamera = CreateCamera(
-                "camera_add" + (i + 1) + "_" + cameraSetCounter,
-                additionalModels[i],
-                "modelAdd" + (i + 1) + "set",
-                newSet.tag
-            );
-            newSet.additionalCameras.Add(additionalCamera);
-            newSet.associatedModels.Add(additionalModels[i]);
-
-            // Add RawImage for additional cameras
-            Camera additionalCamComponent = additionalCamera.GetComponent<Camera>();
-            newSet.renderTextures.Add(CreateRawImageForCamera(additionalCamComponent, $"Add {i + 1} Model View", cameraSetCounter, i + 1));
-        }
+        // Create the additional camera for the additional model
+        GameObject additionalCameraObj = CreateCamera(
+            "camera_additionalModel_" + cameraSetCounter,
+            additionalModel,
+            "modelAdd1set",
+            newSet.tag,
+            setColor,
+            isMain: false
+        );
+        newSet.additionalCamera = additionalCameraObj.GetComponent<Camera>();
+        newSet.associatedModel = additionalModel;
+        newSet.additionalRenderTexture = CreateRawImageForCamera(newSet.additionalCamera, "Additional Model View", cameraSetCounter, 1, setColor);
 
         cameraSets.Add(newSet);
         cameraSetCounter++;
     }
 
-    // GameObject CreateCamera(string cameraName, GameObject model, string layer, string tag)
-    // {
-    //     GameObject newCamera = new GameObject(cameraName);
-    //     newCamera.tag = tag; // Assign the tag to group cameras in the same set
-
-    //     Camera cameraComponent = newCamera.AddComponent<Camera>();
-    //     cameraComponent.cullingMask = 1 << LayerMask.NameToLayer(layer);
-
-    //     // Disable the new camera's display capability
-    //     cameraComponent.enabled = true;
-
-    //     // Position and rotate the camera relative to the model
-    //     Transform modelTransform = model.transform;
-    //     Vector3 relativePosition = new Vector3(0, 5, -10); // Adjust as needed
-    //     Quaternion relativeRotation = Quaternion.Euler(15, 0, 0); // Adjust as needed
-
-    //     newCamera.transform.position = modelTransform.position + modelTransform.TransformDirection(relativePosition);
-    //     newCamera.transform.rotation = modelTransform.rotation * relativeRotation;
-
-    //     // Add debug visual (optional)
-    //     AddDebugColor(newCamera, layer == "modelMainset" ? Color.red : Color.blue);
-
-    //     return newCamera;
-    // }
-    GameObject CreateCamera(string cameraName, GameObject model, string layer, string tag)
+    GameObject CreateCamera(string cameraName, GameObject model, string layer, string tag, Color debugColor, bool isMain)
     {
         GameObject newCamera = new GameObject(cameraName);
         newCamera.tag = tag; // Assign the tag to group cameras in the same set
 
         Camera cameraComponent = newCamera.AddComponent<Camera>();
         cameraComponent.cullingMask = 1 << LayerMask.NameToLayer(layer);
+        // int layerMask = (1 << LayerMask.NameToLayer(layer)) | (1 << LayerMask.NameToLayer("layer5"));
+        // GetComponent<Camera>().cullingMask = layerMask;
 
-        // Set initial position and rotation based on predefined values
-        if (cameraSetCounter < predefinedPositions.Length)
+        // Automatically position the camera based on predefined defaults or the model
+        if (cameraSetCounter < defaultCameraPositions.Length)
         {
-            newCamera.transform.position = predefinedPositions[cameraSetCounter];
-            newCamera.transform.rotation = Quaternion.Euler(predefinedRotations[cameraSetCounter]);
+            // Use predefined position and rotation for the first four cameras
+            newCamera.transform.position = defaultCameraPositions[cameraSetCounter];
+            newCamera.transform.eulerAngles = defaultCameraRotations[cameraSetCounter];
         }
         else
         {
-            // Default position and rotation for additional sets
-            Transform modelTransform = model.transform;
-            Vector3 relativePosition = new Vector3(0, 5, -10); // Adjust as needed
-            Quaternion relativeRotation = Quaternion.Euler(15, 0, 0); // Adjust as needed
-
-            newCamera.transform.position = modelTransform.position + modelTransform.TransformDirection(relativePosition);
-            newCamera.transform.rotation = modelTransform.rotation * relativeRotation;
+            newCamera.transform.position = new Vector3(-2.68f, 4.78f, 0.54f);
+            newCamera.transform.eulerAngles = new Vector3(0, 102.3f, 0);
         }
 
         // Add debug visual (optional)
-        AddDebugColor(newCamera, layer == "modelMainset" ? Color.red : Color.blue);
+        GameObject debugMarker = AddDebugColor(newCamera, debugColor, isMain);
+
+        // If the layer is "modelMainset", add a collider to the debug marker
+        if (layer == "modelMainset")
+        {
+            debugMarker.transform.parent.gameObject.AddComponent<BoxCollider>();
+        }
 
         return newCamera;
     }
 
+    GameObject AddDebugColor(GameObject cameraObject, Color color, bool isMain)
+    {
+        // Adds a sphere to represent the camera for debugging purposes
+        GameObject debugMarker = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        debugMarker.transform.SetParent(cameraObject.transform);
+        debugMarker.transform.localPosition = Vector3.zero;
 
-    RenderTexture CreateRawImageForCamera(Camera camera, string label, int columnIndex, int rowIndex)
+        // Set sphere size based on whether it's the main camera or additional camera
+        float sphereSize = isMain ? 0.2f : 0.1f;
+        debugMarker.transform.localScale = new Vector3(sphereSize, sphereSize, sphereSize);
+
+        Renderer renderer = debugMarker.GetComponent<Renderer>();
+        renderer.material.color = color;
+        return debugMarker;
+    }
+
+    RenderTexture CreateRawImageForCamera(Camera camera, string label, int columnIndex, int rowIndex, Color labelColor)
     {
         // Create a RenderTexture for the camera
-        RenderTexture renderTexture = new RenderTexture(256, 256, 16); // Adjust resolution as needed
+        RenderTexture renderTexture = new RenderTexture(512, 512, 16); // Increase resolution for clarity
         camera.targetTexture = renderTexture;
 
         // Create a RawImage for the camera's view
@@ -324,60 +426,67 @@ public class CameraManager : MonoBehaviour
         Text labelText = textObj.AddComponent<Text>();
         labelText.text = label;
         labelText.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-        labelText.fontSize = 14;
-        labelText.color = Color.white;
+        labelText.fontSize = 16; // Larger font for better visibility
+        labelText.color = labelColor; // Use the same color as the camera set
         labelText.alignment = TextAnchor.MiddleCenter;
 
         // Adjust the layout and position in the grid
-        float xSpacing = 300; // Space between columns
-        float ySpacing = -300; // Space between rows
-        float xOffset = -103;   // Starting x offset
-        float yOffset = -44;     // Starting y offset
+        float xSpacing = 200; // Space between columns (adjusted for larger size)
+        float ySpacing = -250; // Space between rows (adjusted for larger size)
+        float xOffset = -765.9f;   // Starting x offset (tighten placement)
+        float yOffset = -117;   // Starting y offset (tighten placement)
         float xPosition = xOffset + columnIndex * xSpacing;
         float yPosition = yOffset + rowIndex * ySpacing;
 
-        rawImage.rectTransform.sizeDelta = new Vector2(256, 256); // Adjust size as needed
+        // Adjust the RawImage size to make it larger
+        rawImage.rectTransform.sizeDelta = new Vector2(200, 200); // Adjusted size
         rawImage.rectTransform.anchoredPosition = new Vector2(xPosition, yPosition);
 
-        labelText.rectTransform.sizeDelta = new Vector2(256, 20);
-        labelText.rectTransform.anchoredPosition = new Vector2(0, -140);
+        // Adjust label position and size to fit the larger RawImage
+        labelText.rectTransform.sizeDelta = new Vector2(200, 30); // Adjusted label width
+        labelText.rectTransform.anchoredPosition = new Vector2(0, -110); // Adjusted label Y position
 
         return renderTexture;
     }
 
-
-    void AddDebugColor(GameObject cameraObject, Color color)
-    {
-        // Adds a sphere to represent the camera for debugging purposes
-        GameObject debugMarker = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        debugMarker.transform.SetParent(cameraObject.transform);
-        debugMarker.transform.localPosition = Vector3.zero;
-        debugMarker.transform.localScale = new Vector3(0.1f, 0.1f, 0.1f);
-        Renderer renderer = debugMarker.GetComponent<Renderer>();
-        renderer.material.color = color;
-    }
-
     void Update()
     {
+        HandleCameraInput();
+        DetectCameraSelection();
+        UpdateAdditionalCameras();
         // Iterate through all camera sets and update them
         foreach (var cameraSet in cameraSets)
         {
             Camera mainCamera = cameraSet.mainCamera;
             if (mainCamera == null) continue;
 
-            Vector3 relativePosition = mainCamera.transform.position - mainModel.transform.position;
-            Quaternion relativeRotation = Quaternion.Inverse(mainModel.transform.rotation) * mainCamera.transform.rotation;
-
-            for (int i = 0; i < cameraSet.associatedModels.Count; i++)
+            // Find the main model's "mixamorig:Hips" transform
+            Debug.Log("MainModel: " + mainModel);
+            Transform mainHipsTransform = mainModel.transform.Find("mixamorig:Hips");
+            if (mainHipsTransform == null)
             {
-                GameObject model = cameraSet.associatedModels[i];
-                GameObject additionalCamera = cameraSet.additionalCameras[i];
+                continue;
+            }
 
-                // Update additional cameras' position and rotation based on the main camera
-                additionalCamera.transform.position = model.transform.position + relativePosition;
-                additionalCamera.transform.rotation = model.transform.rotation * relativeRotation;
+            // Calculate the distance between the main camera and the main model's hips
+            float mainCameraDistance = Vector3.Distance(mainCamera.transform.position, mainHipsTransform.position);
+
+            if (cameraSet.additionalCamera != null && cameraSet.associatedModel != null)
+            {
+                // Find the additional model's "mixamorig:Hips" transform
+                Transform additionalHipsTransform = cameraSet.associatedModel.transform.Find("mixamorig:Hips");
+                if (additionalHipsTransform == null)
+                {
+                    continue;
+                }
+
+                // Position the additional camera relative to the additional model's hips
+                Vector3 direction = (mainCamera.transform.position - mainHipsTransform.position).normalized;
+                cameraSet.additionalCamera.transform.position = additionalHipsTransform.position + direction * mainCameraDistance;
+
+                // Keep the rotation the same as the main camera
+                cameraSet.additionalCamera.transform.rotation = mainCamera.transform.rotation;
             }
         }
     }
-
 }

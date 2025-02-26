@@ -1,209 +1,197 @@
 using System.Collections.Generic;
 using UnityEngine;
+using System.IO;
 
 public class StaticPoseVisualizer : MonoBehaviour
 {
     public AnimationClip animationClip; // The animation clip to extract
     public GameObject characterPrefab; // Prefab of the character to duplicate
-    public Transform jointToTrack; // Joint to compute and visualize the path
     public Transform mainJoint; // Main joint for angle calculation
     public Transform adjacentJoint1; // First adjacent joint
     public Transform adjacentJoint2; // Second adjacent joint
-    public Vector3 rowStartPosition = Vector3.zero; // Starting position for the row of poses
-    public float spacing = 2f; // Spacing between models in the row
-    public float frameInterval = 0.033f; // Time interval per frame (30 FPS by default)
-    public float secondRowOffset = -1f; // Offset for the second row (visualizing selected joints only)
-    public float visualizationRange = 0.1f; // Range (in seconds) around the current frame to visualize the path
     public Vector3 rotationOffset = Vector3.zero; // Rotation to apply to each pose (in Euler angles)
 
-    private List<Vector3> jointPath = new List<Vector3>(); // Stores the computed joint path
+    public ForceAndTorqueVisualizer forceAndTorqueVisualizer; // Reference to ForceAndTorqueVisualizer
+    public GameObject motionParent;
 
-    void Start()
+    private List<float> adjustedFrameTimes = new List<float>(); // Stores the adjusted frame times
+    private Transform frameContainer; // Stores the frame container for positioning
+    private bool dataReceived = false; // Ensure script only starts after receiving frame data
+    private List<string> csvData = new List<string>(); // List to store CSV data
+
+    private int startframe = -1;
+    private int endframe = -1;
+
+    public void ReceiveFrameData(List<float> frameTimes, Transform frameContainer, int startframe, int endframe)
     {
-        if (animationClip == null || characterPrefab == null || jointToTrack == null || mainJoint == null || adjacentJoint1 == null || adjacentJoint2 == null)
+        Debug.Log($"Received {frameTimes.Count} frame times and a frame container for visualization.");
+
+        // Store the frame container
+        this.frameContainer = frameContainer;
+
+        // Define the scaling factor (video to animation time)
+        const float scalingFactor = 0.5f;
+
+        // Adjust the frame times to match the animation clip's time
+        adjustedFrameTimes.Clear();
+        foreach (float time in frameTimes)
         {
-            Debug.LogError("Missing required assignments in the inspector!");
+            float adjustedTime = time * scalingFactor;
+            adjustedFrameTimes.Add(adjustedTime);
+        }
+
+
+        // Update the start and end frame
+        this.startframe = startframe;
+        this.endframe = endframe;
+
+        // Calculate and update the time interval
+        UpdateTimeInterval();
+
+        // Mark data as received
+        dataReceived = true;
+
+        // Start visualization based on the adjusted times (currently disabled for testing)
+        StartVisualization();
+    }
+
+    private void UpdateTimeInterval()
+    {
+        // Ensure there are at least two frame times to calculate an interval
+        if (adjustedFrameTimes.Count < 2)
+        {
+            Debug.LogWarning("Not enough frame times to calculate a time interval.");
             return;
         }
 
-        PrecomputeJointPath();
-        VisualizeStaticPoses();
-        VisualizeSelectedJoints();
+        // Calculate the average time interval between consecutive frames
+        float totalInterval = 0f;
+        for (int i = 1; i < adjustedFrameTimes.Count; i++)
+        {
+            totalInterval += adjustedFrameTimes[i] - adjustedFrameTimes[i - 1];
+        }
+
+        float averageInterval = totalInterval / (adjustedFrameTimes.Count - 1);
+
+        // Update the frameInterval property
+        Debug.Log($"Updated time interval: {averageInterval:F4}s");
     }
 
-    private void PrecomputeJointPath()
+    private void StartVisualization()
     {
-        float animationLength = animationClip.length;
-        float currentTime = 0f;
-
-        // Create a temporary character to sample animation
-        GameObject tempCharacter = Instantiate(characterPrefab);
-        Destroy(tempCharacter.GetComponent<Animator>());
-
-        while (currentTime < animationLength)
+        if (!dataReceived)
         {
-            // Sample animation at current time
-            animationClip.SampleAnimation(tempCharacter, currentTime);
+            Debug.LogWarning("Cannot start visualization. Frame data has not been received.");
+            return;
+        }
 
-            // Find the joint to track and store its position
-            Transform trackedJoint = FindChildRecursive(tempCharacter.transform, jointToTrack.name);
-            if (trackedJoint != null)
+        // Clear any previously stored CSV data
+        csvData.Clear();
+
+        // Start visualizing static poses
+        VisualizeStaticPoses();
+
+        // Save the data to a CSV file
+        SaveCSV();
+
+        // Notify the ForceAndTorqueVisualizer
+        NotifyForceAndTorqueVisualizer(mainJoint, characterPrefab.name, adjustedFrameTimes[1] - adjustedFrameTimes[0]);
+    }
+
+    private void CreateStaticPose(int frameIndex, float time, RectTransform frameRect)
+    {
+        // Convert RectTransform position (UI Canvas Space) to World Space
+        Vector3 worldPosition;
+        if (RectTransformUtility.ScreenPointToWorldPointInRectangle(
+                frameRect,
+                frameRect.position,
+                Camera.main, // Assuming Main Camera is rendering the UI
+                out worldPosition))
+        {
+            if (characterPrefab.name.Contains("Carmelo"))
             {
-                jointPath.Add(trackedJoint.position);
+                // lower row
+                worldPosition.y -= 2f;
             }
             else
             {
-                Debug.LogError($"Joint {jointToTrack.name} not found in temporary character!");
+                // upper row
+                worldPosition.y -= 1f;
             }
-
-            currentTime += frameInterval;
+            worldPosition.x += 0.5f;
         }
-
-        Destroy(tempCharacter);
-        Debug.Log("Joint path precomputed successfully!");
-    }
-
-    private void VisualizeStaticPoses()
-    {
-        float animationLength = animationClip.length;
-        float currentTime = 0f;
-        int frameIndex = 0;
-
-        // Visualize static poses at each frame
-        while (currentTime < animationLength)
+        else
         {
-            Vector3 labelPosition = rowStartPosition + new Vector3(frameIndex * spacing, 0, 0);
-            CreateStaticPose(frameIndex, currentTime, labelPosition);
-            CreateLabel(labelPosition, currentTime);
-
-            currentTime += frameInterval;
-            frameIndex++;
+            Debug.LogError($"Failed to convert Frame_{frameIndex}'s RectTransform to World Position");
+            return;
         }
 
-        Debug.Log("Static pose visualization completed!");
-    }
-
-    private void VisualizeSelectedJoints()
-    {
-        float animationLength = animationClip.length;
-        float currentTime = 0f;
-        int frameIndex = 0;
-
-        // Visualize selected joints (main joint and adjacent joints)
-        while (currentTime < animationLength)
-        {
-            Vector3 position = rowStartPosition + new Vector3(frameIndex * spacing, secondRowOffset, 0);
-            CreateSelectedJointVisualization(frameIndex, currentTime, position);
-
-            currentTime += frameInterval;
-            frameIndex++;
-        }
-
-        Debug.Log("Selected joints visualization completed!");
-    }
-
-    //private void CreateStaticPose(int frameIndex, float time, Vector3 labelPosition)
-    //{
-    //    // Instantiate a copy of the character prefab for the frame pose
-    //    GameObject framePose = Instantiate(characterPrefab);
-    //    Destroy(framePose.GetComponent<Animator>());
-
-    //    // Sample animation at current time
-    //    animationClip.SampleAnimation(framePose, time);
-
-    //    // Apply the rotation offset to the pose
-    //    framePose.transform.position = labelPosition;
-    //    framePose.transform.rotation = Quaternion.Euler(rotationOffset);  // Apply rotation
-
-    //    // Visualize the trajectory or angle (to be implemented)
-    //    AttachAngleVisualizer(framePose, frameIndex); // Add angle visualization
-    //}
-
-    private void CreateStaticPose(int frameIndex, float time, Vector3 labelPosition)
-    {
         // Instantiate a copy of the character prefab for the frame pose
         GameObject framePose = Instantiate(characterPrefab);
+
+        // Extract the original character's name and create the static pose's name
+        string originalName = characterPrefab.name;
+        framePose.name = originalName + "_pose_" + frameIndex;
+
+        // Destroy the Animator component to make it static
         Destroy(framePose.GetComponent<Animator>());
 
-        // Sample animation at current time
+        // Sample animation at the adjusted time
         animationClip.SampleAnimation(framePose, time);
 
-        // Apply the rotation offset to the pose
-        framePose.transform.position = labelPosition;
-        framePose.transform.rotation = Quaternion.Euler(rotationOffset);  // Apply rotation
+        // Apply the converted world position (with Y offset) and rotation offset
+        framePose.transform.position = worldPosition;
+        framePose.transform.rotation = Quaternion.Euler(rotationOffset); // Apply rotation
 
         // Add a BoxCollider to the pose for click detection
         BoxCollider boxCollider = framePose.AddComponent<BoxCollider>();
-
-        // Optionally, adjust the size of the BoxCollider if necessary
-        boxCollider.size = new Vector3(1, 1, 1);  // Adjust the size based on your character's scale
+        boxCollider.size = new Vector3(1, 1, 1); // Adjust size based on character scale
 
         // Tag the pose with "StaticPose"
         framePose.tag = "StaticPose";
 
-        // Visualize the trajectory or angle (to be implemented)
-        AttachAngleVisualizer(framePose, frameIndex); // Add angle visualization
+        // set parent as motionParent
+        framePose.transform.SetParent(motionParent.transform);
+
+        Debug.Log($"Pose {framePose.name} created at {worldPosition}");
+
+        AttachAngleVisualizer(framePose, frameIndex);
     }
 
-
-    private void CreateSelectedJointVisualization(int frameIndex, float time, Vector3 position)
+    private void VisualizeStaticPoses()
     {
-        GameObject selectedJointsContainer = new GameObject($"SelectedJointsFrame_{frameIndex}");
 
-        GameObject tempCharacter = Instantiate(characterPrefab);
-        Destroy(tempCharacter.GetComponent<Animator>());
-        animationClip.SampleAnimation(tempCharacter, time);
+        if (frameContainer == null)
+        {
+            Debug.LogError("Frame container is not set. Cannot visualize static poses.");
+            return;
+        }
 
-        Transform mainJointInFrame = FindChildRecursive(tempCharacter.transform, mainJoint.name);
-        Transform joint1InFrame = FindChildRecursive(tempCharacter.transform, adjacentJoint1.name);
-        Transform joint2InFrame = FindChildRecursive(tempCharacter.transform, adjacentJoint2.name);
+        // Iterate through the frames based on the start and end frame numbers
+        for (int i = startframe; i <= endframe; i++)
+        {
+            // Get the Frame_X RectTransform from the frame container
+            Transform frameTransform = frameContainer.Find($"Frame_{i}");
+            if (frameTransform == null)
+            {
+                Debug.LogError($"Frame_{i} not found in the FrameContainer.");
+                continue;
+            }
 
-        Destroy(tempCharacter);
+            RectTransform frameRect = frameTransform.GetComponent<RectTransform>();
+            if (frameRect == null)
+            {
+                Debug.LogError($"Frame_{i} does not have a RectTransform component.");
+                continue;
+            }
+
+            // Use adjusted frame time and the frame's position
+            float time = adjustedFrameTimes[i - startframe];
+            CreateStaticPose(i, time, frameRect);
+        }
+
+        Debug.Log("Static pose visualization completed!");
     }
-
-    //private void AttachTrajectory(GameObject framePose, int frameIndex)
-    //{
-    //    Transform jointInFramePose = FindChildRecursive(framePose.transform, jointToTrack.name);
-
-    //    if (jointInFramePose == null)
-    //    {
-    //        Debug.LogError($"Joint {jointToTrack.name} not found in frame pose!");
-    //        return;
-    //    }
-
-    //    LineRenderer lineRenderer = jointInFramePose.gameObject.AddComponent<LineRenderer>();
-
-    //    // Calculate the start and end indices for the path segment
-    //    int startIndex = Mathf.Max(0, frameIndex - Mathf.RoundToInt(visualizationRange / frameInterval));
-    //    int endIndex = Mathf.Min(jointPath.Count - 1, frameIndex + Mathf.RoundToInt(visualizationRange / frameInterval));
-
-    //    int segmentCount = endIndex - startIndex + 1;
-    //    Vector3[] pathSegment = new Vector3[segmentCount];
-
-    //    // Extract the segment of the path to visualize
-    //    jointPath.CopyTo(startIndex, pathSegment, 0, segmentCount);
-
-    //    lineRenderer.positionCount = segmentCount;
-
-    //    // Align the segment with the frame pose
-    //    Vector3 alignmentOffset = jointInFramePose.position - jointPath[frameIndex];
-    //    for (int i = 0; i < segmentCount; i++)
-    //    {
-    //        pathSegment[i] += alignmentOffset;
-    //    }
-
-    //    lineRenderer.SetPositions(pathSegment);
-
-    //    // Set thinner line width
-    //    lineRenderer.startWidth = 0.02f;
-    //    lineRenderer.endWidth = 0.02f;
-
-    //    // Set color to pink
-    //    lineRenderer.material = new Material(Shader.Find("Sprites/Default"));
-    //    lineRenderer.material.color = Color.magenta;
-
-    //    Debug.Log($"Path segment visualized from frame {startIndex} to {endIndex}.");
-    //}
 
     private void AttachAngleVisualizer(GameObject framePose, int frameIndex)
     {
@@ -221,15 +209,172 @@ public class StaticPoseVisualizer : MonoBehaviour
         Vector3 vector2 = joint2InFrame.position - mainJointInFrame.position;
 
         float angle = Vector3.Angle(vector1, vector2);
-        Debug.Log($"Angle at frame {frameIndex}: {angle}°");
 
-        DrawArc(mainJointInFrame.position, vector1, vector2, angle);
-        CreateAngleLabel(mainJointInFrame.position, angle);
+        // Save the position of the main joint and the calculated angle
+        string row = $"{frameIndex},{mainJointInFrame.position.x},{mainJointInFrame.position.y},{mainJointInFrame.position.z},{angle}";
+        csvData.Add(row);
+
+        DrawArc(framePose, mainJointInFrame.position, vector1, vector2, angle);
+        CreateAngleLabel(framePose, mainJointInFrame.position, angle);
     }
 
-    private void DrawArc(Vector3 center, Vector3 vector1, Vector3 vector2, float angle)
+    private void SaveCSV()
+    {
+        // Ensure there's data to write。/
+        if (csvData.Count == 0)
+        {
+            Debug.LogWarning("No data to save.");
+            return;
+        }
+
+        // Generate the file path based on the animation clip name
+        string path = $"Assets/{characterPrefab.name}_joint_data.csv";
+
+        float totalTime = (adjustedFrameTimes[adjustedFrameTimes.Count - 1] - adjustedFrameTimes[0]) * 2;
+        Debug.Log($"Total time: {totalTime:F2}s");
+
+        // Compute the angular velocity, acceleration, and force vector
+        float angularVelocity = ComputeAngularVelocity(csvData, totalTime / csvData.Count);
+        float angularAcceleration = ComputeAngularAcceleration(csvData, totalTime / csvData.Count);
+        Vector3 forceVector = ComputeForceVector(csvData, totalTime / csvData.Count, 1.0f); // Assuming mass = 1kg
+
+        // Write the header with the desired order
+        List<string> csvContent = new List<string>();
+        csvContent.Add("Frame,MainJoint_X,MainJoint_Y,MainJoint_Z,Angle,AngularVelocity,AngularAcceleration,ForceVector_X,ForceVector_Y,ForceVector_Z");
+
+        // Update the first row with calculated data
+        string[] firstRowParts = csvData[0].Split(',');
+        string updatedFirstRow = $"{firstRowParts[0]},{firstRowParts[1]},{firstRowParts[2]},{firstRowParts[3]},{firstRowParts[4]},{angularVelocity:F4},{angularAcceleration:F4},{forceVector.x:F4},{forceVector.y:F4},{forceVector.z:F4}";
+        csvContent.Add(updatedFirstRow);
+
+        // Add the remaining rows (starting from the second row)
+        for (int i = 1; i < csvData.Count; i++)
+        {
+            csvContent.Add(csvData[i]);
+        }
+
+        // Write the data to the CSV file
+        File.WriteAllLines(path, csvContent);
+        Debug.Log($"CSV saved to: {path}");
+    }
+
+    private float ComputeAngularVelocity(List<string> csvData, float timeInterval)
+    {
+        // Extract angle for first and last frames
+        string[] firstRow = csvData[0].Split(',');
+        string[] lastRow = csvData[csvData.Count - 1].Split(',');
+        float firstAngle = float.Parse(firstRow[4]);
+        float lastAngle = float.Parse(lastRow[4]);
+
+        // Calculate angular velocity
+        return (lastAngle - firstAngle) / (timeInterval * (csvData.Count - 1));
+    }
+
+    private float ComputeAngularAcceleration(List<string> csvData, float timeInterval)
+    {
+        // Extract angles for the first, middle, and last frames
+        string[] firstRow = csvData[0].Split(',');
+        string[] midRow = csvData[csvData.Count / 2].Split(',');
+        string[] lastRow = csvData[csvData.Count - 1].Split(',');
+        float firstAngle = float.Parse(firstRow[4]);
+        float midAngle = float.Parse(midRow[4]);
+        float lastAngle = float.Parse(lastRow[4]);
+
+        // Compute angular velocities at the start and end
+        float initialVelocity = (midAngle - firstAngle) / (timeInterval * (csvData.Count / 2));
+        float finalVelocity = (lastAngle - midAngle) / (timeInterval * (csvData.Count / 2));
+
+        // Calculate angular acceleration
+        return (finalVelocity - initialVelocity) / (timeInterval * csvData.Count);
+    }
+
+    private Vector3 ComputeForceVector(List<string> csvData, float timeInterval, float mass)
+    {
+        // Ensure there are at least two frames of data
+        if (csvData.Count < 2)
+        {
+            Debug.LogError("Not enough data to compute force vector.");
+            return Vector3.zero;
+        }
+
+        // Extract position data for the first and second frames
+        string[] firstRow = csvData[0].Split(',');
+        string[] secondRow = csvData[1].Split(',');
+        string[] lastRow = csvData[csvData.Count - 1].Split(',');
+
+        // Parse positions
+        Vector3 firstPosition = new Vector3(
+            float.Parse(firstRow[1]),
+            float.Parse(firstRow[2]),
+            float.Parse(firstRow[3])
+        );
+        Vector3 secondPosition = new Vector3(
+            float.Parse(secondRow[1]),
+            float.Parse(secondRow[2]),
+            float.Parse(secondRow[3])
+        );
+        Vector3 lastPosition = new Vector3(
+            float.Parse(lastRow[1]),
+            float.Parse(lastRow[2]),
+            float.Parse(lastRow[3])
+        );
+
+        // Calculate velocity for the first two frames
+        Vector3 initialVelocity = (secondPosition - firstPosition) / timeInterval;
+
+        // Calculate velocity for the last two frames
+        Vector3 finalVelocity = (lastPosition - secondPosition) / timeInterval;
+
+        // Calculate acceleration (change in velocity over time)
+        Vector3 acceleration = (finalVelocity - initialVelocity) / (timeInterval * (csvData.Count - 1));
+
+        // Calculate force vector (F = m * a)
+        return mass * acceleration;
+    }
+
+    private Transform FindChildRecursive(Transform parent, string name)
+    {
+        foreach (Transform child in parent)
+        {
+            if (child.name == name)
+            {
+                return child;
+            }
+
+            Transform found = FindChildRecursive(child, name);
+            if (found != null)
+            {
+                return found;
+            }
+        }
+
+        return null;
+    }
+
+    private void NotifyForceAndTorqueVisualizer(Transform mainJoint, string name, float timeInterval)
+    {
+        if (forceAndTorqueVisualizer == null)
+        {
+            Debug.LogError("ForceAndTorqueVisualizer is not assigned in the Inspector.");
+            return;
+        }
+
+        if (mainJoint == null)
+        {
+            Debug.LogError("Main joint is not assigned or found.");
+            return;
+        }
+
+        forceAndTorqueVisualizer.SetJoints(mainJoint);
+        forceAndTorqueVisualizer.SetTimeInterval(name, timeInterval);
+        Debug.Log("Selected Joints notified ForceAndTorqueVisualizer");
+    }
+
+    private void DrawArc(GameObject framepose, Vector3 center, Vector3 vector1, Vector3 vector2, float angle)
     {
         LineRenderer arcRenderer = new GameObject("AngleArc").AddComponent<LineRenderer>();
+        // set anglearc's parent to framepose
+        arcRenderer.transform.SetParent(framepose.transform);
         arcRenderer.startWidth = 0.02f;
         arcRenderer.endWidth = 0.02f;
 
@@ -253,10 +398,11 @@ public class StaticPoseVisualizer : MonoBehaviour
         }
     }
 
-    private void CreateAngleLabel(Vector3 position, float angle)
+    private void CreateAngleLabel(GameObject framepose, Vector3 position, float angle)
     {
         GameObject labelObject = new GameObject("AngleLabel");
-        MeshRenderer meshRenderer = labelObject.AddComponent<MeshRenderer>();
+        // set anglelabel's parent to framepose
+        labelObject.transform.SetParent(framepose.transform);
         TextMesh textMesh = labelObject.AddComponent<TextMesh>();
 
         textMesh.text = $"{angle:F1}°";
@@ -264,18 +410,13 @@ public class StaticPoseVisualizer : MonoBehaviour
         textMesh.characterSize = 0.05f;
         textMesh.color = Color.red;
 
-        textMesh.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-
         labelObject.transform.position = position + new Vector3(0, 0.2f, 0);
         labelObject.transform.rotation = Quaternion.identity;
-
-        Debug.Log($"Angle label created at {labelObject.transform.position} with value {angle}°");
     }
 
     private void CreateLabel(Vector3 position, float time)
     {
         GameObject labelObject = new GameObject("FrameLabel");
-        MeshRenderer meshRenderer = labelObject.AddComponent<MeshRenderer>();
         TextMesh textMesh = labelObject.AddComponent<TextMesh>();
 
         textMesh.text = $"{time:F2}s";
@@ -285,24 +426,5 @@ public class StaticPoseVisualizer : MonoBehaviour
 
         labelObject.transform.position = position + new Vector3(0, 2f, 0);
         labelObject.transform.rotation = Quaternion.identity;
-    }
-
-    private Transform FindChildRecursive(Transform parent, string name)
-    {
-        foreach (Transform child in parent)
-        {
-            if (child.name == name)
-            {
-                return child;
-            }
-
-            Transform found = FindChildRecursive(child, name);
-            if (found != null)
-            {
-                return found;
-            }
-        }
-
-        return null;
     }
 }
