@@ -5,6 +5,7 @@ using TMPro;
 using UnityEngine.EventSystems;
 using System.Collections;
 using System.Collections.Generic;
+using Nobi.UiRoundedCorners;
 
 public class VideoController : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
 {
@@ -175,7 +176,7 @@ public class VideoController : MonoBehaviour, IPointerDownHandler, IPointerUpHan
             frameContainer.name = "FrameContainer_" + videoPlayer.clip.name;
             frameContainer.SetParent(videoScreen.parent, false);
             // frameContainer.localPosition = Vector3.zero;
-            frameContainer.localPosition = new Vector3(-100, frameContainer.localPosition.y, frameContainer.localPosition.z);
+            frameContainer.localPosition = new Vector3(-120, frameContainer.localPosition.y, frameContainer.localPosition.z);
 
         }
 
@@ -200,11 +201,15 @@ public class VideoController : MonoBehaviour, IPointerDownHandler, IPointerUpHan
             Texture2D frameTexture = new Texture2D(tempRenderTexture.width, tempRenderTexture.height, TextureFormat.RGB24, false);
             frameTexture.ReadPixels(new Rect(0, 0, tempRenderTexture.width, tempRenderTexture.height), 0, 0);
             frameTexture.Apply();
-            RenderTexture.active = null;
+            RenderTexture.active = null;            
 
             GameObject frameObj = Instantiate(framePrefab, frameContainer);
             frameObj.name = $"Frame_{i}";
             frameObj.GetComponent<Image>().sprite = Sprite.Create(frameTexture, new Rect(0, 0, frameTexture.width, frameTexture.height), Vector2.zero);
+
+            // make the frame rounded by adding "image with rounded corners" script and set the radius to 22
+            ImageWithRoundedCorners imageWithRoundedCorners = frameObj.AddComponent<ImageWithRoundedCorners>();
+            imageWithRoundedCorners.radius = 22;
 
             Button frameButton = frameObj.GetComponent<Button>();
             if (frameButton != null)
@@ -234,13 +239,11 @@ public class VideoController : MonoBehaviour, IPointerDownHandler, IPointerUpHan
         {
             startFrame = index;
             HighlightFrame(startBoundingBox, frameRect);
-            Debug.Log($"Start frame selected: {index}");
         }
         else if (endFrame == -1)
         {
             endFrame = index;
             HighlightFrame(endBoundingBox, frameRect);
-            Debug.Log($"End frame selected: {index}");
             framesReady = true;
             SendFrameData();
         }
@@ -249,7 +252,6 @@ public class VideoController : MonoBehaviour, IPointerDownHandler, IPointerUpHan
             startFrame = index;
             endFrame = -1;
             HighlightFrame(startBoundingBox, frameRect);
-            Debug.Log($"Start frame reset: {index}");
         }
     }
 
@@ -275,18 +277,6 @@ public class VideoController : MonoBehaviour, IPointerDownHandler, IPointerUpHan
         boundingBox.SetActive(true);
     }
 
-    // private void SendFrameData()
-    // {
-    //     if (framesReady)
-    //     {
-    //         string videoName = videoPlayer.clip != null ? videoPlayer.clip.name : "UnknownVideo";
-    //         float startTime = startFrame * timeInterval;
-    //         float endTime = endFrame * timeInterval;
-
-    //         FrameSelectionManager.Instance.SetFrameData(videoName, startFrame, endFrame, startTime, endTime);
-    //     }
-    // }
-
     private void SendFrameData()
     {
         if (framesReady)
@@ -302,8 +292,8 @@ public class VideoController : MonoBehaviour, IPointerDownHandler, IPointerUpHan
 
     private void CreateBoundingBoxes()
     {
-        startBoundingBox = CreateBoundingBox("StartBoundingBox", Color.green);
-        endBoundingBox = CreateBoundingBox("EndBoundingBox", Color.red);
+        startBoundingBox = CreateBoundingBox("StartBoundingBox", Color.white);
+        endBoundingBox = CreateBoundingBox("EndBoundingBox", Color.white);
     }
 
     private GameObject CreateBoundingBox(string name, Color color)
@@ -314,6 +304,8 @@ public class VideoController : MonoBehaviour, IPointerDownHandler, IPointerUpHan
         Image image = box.GetComponent<Image>();
         image.color = new Color(color.r, color.g, color.b, 0.5f);
         box.SetActive(false);
+        ImageWithRoundedCorners imageWithRoundedCorners = box.AddComponent<ImageWithRoundedCorners>();
+        imageWithRoundedCorners.radius = 22;
         return box;
     }
 

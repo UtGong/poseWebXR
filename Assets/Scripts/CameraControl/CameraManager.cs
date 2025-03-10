@@ -7,6 +7,7 @@ public class CameraManager : MonoBehaviour
 {
     public Button linkedButton; // Assign the linked button in the Inspector
     public Canvas canvas; // Assign the UI Canvas in the Inspector
+    public GameObject motionParent; // Assign the parent object for the models in the Inspector
 
     private Camera displayCamera; // The camera used for display
     private int cameraSetCounter = 0; // Tracks the number of camera sets added
@@ -33,7 +34,7 @@ public class CameraManager : MonoBehaviour
     private readonly Color[] cameraSetColors = {
     Color.green, Color.blue, Color.red, Color.yellow, Color.magenta
     };
-    
+
     private class CameraSet
     {
         public Camera mainCamera;
@@ -43,7 +44,6 @@ public class CameraManager : MonoBehaviour
         public RenderTexture mainRenderTexture; // RenderTexture for main camera
         public RenderTexture additionalRenderTexture; // RenderTexture for additional camera
     }
-
 
     private List<CameraSet> cameraSets = new List<CameraSet>(); // Track all camera sets
 
@@ -126,44 +126,31 @@ public class CameraManager : MonoBehaviour
         }
         Debug.Log($"Looking for '{modelName}' in layer '{layerName}'...");
 
-        // Find the Canvas using recursive search
-        GameObject canvasObject = FindCanvasByName("CanvasResult");
-        if (canvasObject == null)
+        Debug.Log("MotionParent found under Canvas, motionParent's name: " + motionParent.name);
+        Debug.Log("MotionParent child count: " + motionParent.transform.childCount);
+        foreach (Transform container in motionParent.transform)
         {
-            Debug.LogError("Canvas 'CanvasResult' not found.");
-            return null;
-        }
-
-        // Find the 'MotionParent' under the Canvas
-        Transform motionParent = canvasObject.transform.Find("MotionParent");
-        if (motionParent == null)
-        {
-            Debug.LogError("MotionParent not found under the Canvas!");
-            return null;
-        }
-
-        // Find the object by name under the MotionParent
-        Transform objectTransform = motionParent.Find(modelName);
-        if (objectTransform != null)
-        {
-            GameObject obj = objectTransform.gameObject;
-
-            // Check if the object is in the correct layer and matches the model name
-            if (obj.layer == layer && obj.name == modelName)
+            Debug.Log("Current container: " + container.name);
+            if (container.name.ToLower().Contains("posecontainer"))
             {
-                Debug.Log($"[CameraManager] Found object: {obj.name} in layer: {layerName}");
-                return obj; // Return the GameObject
-            }
-            else
-            {
-                Debug.Log($"Object found, but does not match layer or name: {obj.name}");
+                Debug.Log($"[CameraManager] Searching under container: {container.name}");
+                // Search for a child with the matching model name in this container
+                Transform modelTransform = container.Find(modelName);
+                if (modelTransform != null)
+                {
+                    GameObject obj = modelTransform.gameObject;
+                    if (obj.layer == layer && obj.name == modelName)
+                    {
+                        Debug.Log($"[CameraManager] Found object: {obj.name} in layer: {layerName} under container '{container.name}'");
+                        return obj;
+                    }
+                    else
+                    {
+                        Debug.Log($"Object found under container '{container.name}', but does not match layer or name: {obj.name}");
+                    }
+                }
             }
         }
-        else
-        {
-            Debug.Log("Object not found under the Canvas!");
-        }
-
         return null; // No matching object found
     }
 

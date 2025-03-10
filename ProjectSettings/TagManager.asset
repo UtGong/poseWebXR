@@ -29,8 +29,8 @@ TagManager:
   - modelAdd2set
   - modelAdd3set
   - 3Dlayer
-  - layer6
-  - layer7
+  - carmeloposelayer
+  - kdposelayer
   - layer8
   - layer9
   - layer10

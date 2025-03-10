@@ -1,172 +1,132 @@
 // using System.Collections.Generic;
 // using UnityEngine;
+// using UnityEngine.UI;
+// using UnityEngine.EventSystems;
 
 // public class StaticPoseSelector : MonoBehaviour
 // {
-//     public List<GameObject> staticPoses = new List<GameObject>();
-//     public GameObject selectedPose1;
-//     public GameObject selectedPose2;
+//     public static StaticPoseSelector Instance;
+
+//     public List<GameObject> staticPoses = new List<GameObject>(); // RawImages tagged "StaticPose"
+//     public GameObject selectedPose1; // Associated real pose for selection 1
+//     public GameObject selectedPose2; // Associated real pose for selection 2
 
 //     private Camera mainCamera;
 
-//     private GameObject clonedPose1;
-//     private GameObject clonedPose2;
+//     private GameObject clonedContainer1; // Cloned container for selection 1 (contains pose, camera, RawImage)
+//     private GameObject clonedContainer2; // Cloned container for selection 2
 
-//     public CameraManager cameraManager; // Assign this in the Inspector
-//     public ForceAndTorqueVisualizer forceAndTorqueVisualizer; // Reference to the ForceAndTorqueVisualizer script
+//     public CameraManager cameraManager; // Assign via Inspector
+//     public ForceAndTorqueVisualizer forceAndTorqueVisualizer; // Reference to ForceAndTorqueVisualizer
 
+//     // Parent for the raw images used during selection (contains containers with real poses and preview cameras)
 //     public GameObject motionParent;
 
+//     // Parent under the CanvasResult where the cloned containers and video frames will be placed
+//     public GameObject canvasResultMotionParent;
+
+//     // Buffers to store the selected RawImage (the clickable UI element)
 //     private GameObject newPoseBuffer1;
 //     private GameObject newPoseBuffer2;
 
-//     private int poseCounter = 0; // Counter for unique pose names
+//     private int poseCounter = 0; // For unique naming
 
-//     private Dictionary<GameObject, GameObject> poseRectangles = new Dictionary<GameObject, GameObject>(); // To store rectangles for poses
+//     // Dictionary to store bounding box objects for each real pose
+//     private Dictionary<GameObject, GameObject> poseRectangles = new Dictionary<GameObject, GameObject>();
+
+//     // Dictionary mapping each clickable RawImage to its corresponding real pose.
+//     public Dictionary<GameObject, GameObject> rawImageToRealPose = new Dictionary<GameObject, GameObject>();
+
+//     public void AddRawImageToPoseMapping(GameObject rawImage, GameObject realPose)
+//     {
+//         rawImageToRealPose[rawImage] = realPose;
+//     }
+
+//     void Awake()
+//     {
+//         Instance = this;
+//     }
 
 //     void Start()
 //     {
 //         mainCamera = Camera.main;
-
 //         staticPoses.AddRange(GameObject.FindGameObjectsWithTag("StaticPose"));
-
-//         foreach (var pose in staticPoses)
+//         foreach (var rawImageObj in staticPoses)
 //         {
-//             BoxCollider collider = pose.GetComponent<BoxCollider>();
-//             if (collider == null)
-//             {
-//                 collider = pose.AddComponent<BoxCollider>();
-//             }
-//             collider.size = new Vector3(1, 1, 1);
+//             if (rawImageObj.GetComponent<BoxCollider>() == null)
+//                 rawImageObj.AddComponent<BoxCollider>();
+//             if (rawImageObj.GetComponent<RawImageClickHandler>() == null)
+//                 rawImageObj.AddComponent<RawImageClickHandler>();
 //         }
-
 //         if (cameraManager == null)
 //         {
 //             cameraManager = FindObjectOfType<CameraManager>();
 //             if (cameraManager == null)
-//             {
 //                 Debug.LogError("[StaticPoseSelector] CameraManager not found. Please assign it in the Inspector.");
-//             }
 //         }
 //     }
 
-//     void Update()
+//     // Called by RawImageClickHandler when a RawImage is clicked.
+//     public void HandleRawImageClick(GameObject clickedRawImage)
 //     {
-//         if (Input.GetMouseButtonDown(0))
+//         Debug.Log($"[StaticPoseSelector] RawImage clicked: {clickedRawImage.name}");
+//         if (!rawImageToRealPose.TryGetValue(clickedRawImage, out GameObject realPose))
 //         {
-//             SelectPose();
+//             Debug.LogWarning($"No real pose found for raw image '{clickedRawImage.name}'.");
+//             return;
 //         }
-//     }
-
-//     void SelectPose()
-//     {
-//         Ray ray = mainCamera.ScreenPointToRay(Input.mousePosition);
-//         if (Physics.Raycast(ray, out RaycastHit hit))
+//         AddRectangleToPose(realPose);
+//         if (newPoseBuffer1 == null)
 //         {
-//             GameObject hitObject = hit.collider.gameObject;
-
-//             if (hitObject.CompareTag("StaticPose"))
-//             {
-//                 // Check if the clicked pose is one of the original selected poses
-//                 if (hitObject == selectedPose1 || hitObject == selectedPose2)
-//                 {
-//                     Debug.Log("[StaticPoseSelector] Selected pose is already one of the two active poses.");
-//                     return;
-//                 }
-
-//                 // Add a rectangle around the selected pose
-//                 AddRectangleToPose(hitObject);
-
-//                 // Handle new pose selection
-//                 if (newPoseBuffer1 == null)
-//                 {
-//                     newPoseBuffer1 = hitObject; // Keep original name
-//                     Debug.Log($"[StaticPoseSelector] New Pose 1 selected: {newPoseBuffer1.name}");
-//                 }
-//                 else if (newPoseBuffer2 == null)
-//                 {
-//                     newPoseBuffer2 = hitObject; // Keep original name
-//                     Debug.Log($"[StaticPoseSelector] New Pose 2 selected: {newPoseBuffer2.name}");
-
-//                     // Two new poses selected, proceed to replace the original ones
-//                     ReplaceSelectedPoses();
-//                     AdjustHipJointRotation();
-//                 }
-//                 else
-//                 {
-//                     Debug.Log("[StaticPoseSelector] Resetting selection due to a third new pose.");
-//                     ResetNewPoseBuffer();
-//                 }
-//             }
+//             newPoseBuffer1 = clickedRawImage;
+//             Debug.Log($"[StaticPoseSelector] New Pose 1 selected (RawImage): {clickedRawImage.name}");
 //         }
-//     }
-
-//     void AdjustHipJointRotation()
-//     {
-//         // Assuming both poses have a hip joint (can be identified by the name or specific tag)
-//         Transform hipJoint1 = clonedPose1.transform.Find("mixamorig:Hips");  // Update with correct bone name or tag
-//         Transform hipJoint2 = clonedPose2.transform.Find("mixamorig:Hips");  // Update with correct bone name or tag
-
-//         if (hipJoint1 != null && hipJoint2 != null)
+//         else if (newPoseBuffer2 == null)
 //         {
-//             // Match the rotation of the second pose's hip joint to the first pose's hip joint
-//             hipJoint2.rotation = hipJoint1.rotation;
-//             Debug.Log("[StaticPoseSelector] Hip joint rotation of Pose 2 matched to Pose 1.");
+//             newPoseBuffer2 = clickedRawImage;
+//             Debug.Log($"[StaticPoseSelector] New Pose 2 selected (RawImage): {clickedRawImage.name}");
+//             ReplaceSelectedPoses();
+//             AdjustHipJointRotation();
 //         }
 //         else
 //         {
-//             Debug.LogWarning("[StaticPoseSelector] Could not find hip joint in one or both poses.");
+//             Debug.Log("[StaticPoseSelector] More than two selections detected. Resetting selection.");
+//             ResetNewPoseBuffer();
 //         }
 //     }
 
 //     void AddRectangleToPose(GameObject pose)
 //     {
 //         if (poseRectangles.ContainsKey(pose))
-//         {
-//             // If rectangle already exists, do nothing
 //             return;
-//         }
-
-//         // Find the "mixamorig:Hips" transform in the pose hierarchy
 //         Transform hipsTransform = pose.transform.Find("mixamorig:Hips");
 //         if (hipsTransform == null)
 //         {
 //             Debug.LogWarning($"[StaticPoseSelector] mixamorig:Hips not found in {pose.name}. Rectangle not added.");
 //             return;
 //         }
-
-//         // Create a new rectangle object
 //         GameObject rectangle = new GameObject($"{pose.name}_Rectangle");
 //         rectangle.transform.SetParent(pose.transform);
-//         rectangle.transform.position = hipsTransform.position; // Align rectangle with the hips position
-
-//         // Add LineRenderer component to draw the rectangle
-//         LineRenderer lineRenderer = rectangle.AddComponent<LineRenderer>();
-//         lineRenderer.positionCount = 5; // Four corners + one to close the rectangle
-//         lineRenderer.startWidth = 0.02f;
-//         lineRenderer.endWidth = 0.02f;
-//         lineRenderer.useWorldSpace = true;
-
-//         // Define rectangle corners based on the hips position and an arbitrary size
-//         float rectWidth = 1.0f;  // Adjust width as needed
-//         float rectHeight = 1.5f; // Adjust height as needed
-
+//         rectangle.transform.position = hipsTransform.position;
+//         LineRenderer lr = rectangle.AddComponent<LineRenderer>();
+//         lr.positionCount = 5;
+//         lr.startWidth = 0.02f;
+//         lr.endWidth = 0.02f;
+//         lr.useWorldSpace = true;
+//         float rectW = 1.0f, rectH = 1.5f;
 //         Vector3[] corners = new Vector3[]
 //         {
-//         hipsTransform.position + new Vector3(-rectWidth / 2, -rectHeight / 2, 0), // Bottom-left
-//         hipsTransform.position + new Vector3(rectWidth / 2, -rectHeight / 2, 0),  // Bottom-right
-//         hipsTransform.position + new Vector3(rectWidth / 2, rectHeight / 2, 0),   // Top-right
-//         hipsTransform.position + new Vector3(-rectWidth / 2, rectHeight / 2, 0),  // Top-left
-//         hipsTransform.position + new Vector3(-rectWidth / 2, -rectHeight / 2, 0)  // Closing the rectangle
+//             hipsTransform.position + new Vector3(-rectW/2, -rectH/2, 0),
+//             hipsTransform.position + new Vector3(rectW/2, -rectH/2, 0),
+//             hipsTransform.position + new Vector3(rectW/2, rectH/2, 0),
+//             hipsTransform.position + new Vector3(-rectW/2, rectH/2, 0),
+//             hipsTransform.position + new Vector3(-rectW/2, -rectH/2, 0)
 //         };
-//         lineRenderer.SetPositions(corners);
-
-//         // Set line color
-//         lineRenderer.material = new Material(Shader.Find("Sprites/Default"));
-//         lineRenderer.startColor = Color.red;
-//         lineRenderer.endColor = Color.red;
-
-//         // Store rectangle reference
+//         lr.SetPositions(corners);
+//         lr.material = new Material(Shader.Find("Sprites/Default"));
+//         lr.startColor = Color.red;
+//         lr.endColor = Color.red;
+//         rectangle.layer = pose.layer;
 //         poseRectangles[pose] = rectangle;
 //     }
 
@@ -179,148 +139,330 @@
 //         }
 //     }
 
-//     GameObject AssignUniqueName(GameObject pose)
-//     {
-//         poseCounter++;
-//         pose.name = $"{pose.name}_Unique_{poseCounter}";
-//         return pose;
-//     }
-
 //     void ResetNewPoseBuffer()
 //     {
 //         newPoseBuffer1 = null;
 //         newPoseBuffer2 = null;
 //     }
 
+//     // Clones the container (the parent of the real pose) and recreates a new RawImage.
+//     // After cloning, it removes any old RawImage, creates a new one for the cloned preview camera,
+//     // sets its anchored position based on your rule, and then sets the "mixamorig:Hips" child's local Y to 0.
+//     GameObject CloneContainerFromRawImage(GameObject rawImageSource, Vector2 dummy) // dummy parameter not used
+//     {
+//         if (rawImageSource == null)
+//             return null;
+
+//         if (!rawImageToRealPose.TryGetValue(rawImageSource, out GameObject realPose))
+//         {
+//             Debug.LogWarning("No real pose found for the given raw image.");
+//             return null;
+//         }
+
+//         Transform originalContainer = realPose.transform.parent;
+//         if (originalContainer == null)
+//         {
+//             Debug.LogWarning("Real pose has no parent container.");
+//             return null;
+//         }
+
+//         GameObject containerClone = Instantiate(originalContainer.gameObject);
+//         containerClone.name = originalContainer.gameObject.name + "_Clone_" + poseCounter++;
+
+//         // Remove any children whose names contain "_Rectangle" from the clone.
+//         foreach (Transform child in containerClone.GetComponentsInChildren<Transform>())
+//         {
+//             if (child.name.Contains("_Rectangle"))
+//                 Destroy(child.gameObject);
+//         }
+
+//         // Remove the old RawImage from the clone.
+//         RawImage oldRaw = containerClone.GetComponentInChildren<RawImage>();
+//         if (oldRaw != null)
+//             Destroy(oldRaw.gameObject);
+
+//         // Set the container's RectTransform anchored position.
+//         RectTransform containerRT = containerClone.GetComponent<RectTransform>();
+//         // (We later set the container's anchored position in ReplaceSelectedPoses, so no need to set here)
+
+//         // Find the preview camera in the cloned container.
+//         Camera clonedCamera = containerClone.GetComponentInChildren<Camera>();
+//         if (clonedCamera == null)
+//         {
+//             Debug.LogWarning("No preview camera found in cloned container.");
+//             return containerClone;
+//         }
+
+//         // Create a new RenderTexture and assign it to the cloned camera.
+//         RenderTexture newRT = new RenderTexture(1024, 1024, 16);
+//         clonedCamera.targetTexture = newRT;
+
+//         // Create a new RawImage for the cloned camera.
+//         GameObject newRawImgObj = new GameObject(containerClone.name + "_RawImage");
+//         RawImage newRawImg = newRawImgObj.AddComponent<RawImage>();
+//         newRawImg.texture = newRT;
+//         RectTransform rawImgRT = newRawImg.GetComponent<RectTransform>();
+//         rawImgRT.sizeDelta = new Vector2(300, 300); // adjust size as needed
+//         // We will set the anchored position later in ReplaceSelectedPoses.
+//         newRawImgObj.tag = "StaticPose";
+//         if (newRawImgObj.GetComponent<RawImageClickHandler>() == null)
+//             newRawImgObj.AddComponent<RawImageClickHandler>();
+
+//         newRawImgObj.transform.SetParent(containerClone.transform, false);
+
+//         // Set the "mixamorig:Hips" child's local Y position to 0.
+//         Transform hips = FindChildByName(containerClone, "mixamorig:Hips");
+//         if (hips != null)
+//         {
+//             Vector3 pos = hips.localPosition;
+//             hips.localPosition = new Vector3(pos.x, 0f, pos.z);
+//         }
+//         else
+//         {
+//             Debug.LogWarning("mixamorig:Hips not found in cloned container.");
+//         }
+
+//         return containerClone;
+//     }
+
+//     // Helper: Recursively finds a child by name.
+//     Transform FindChildByName(GameObject parent, string name)
+//     {
+//         foreach (Transform child in parent.transform)
+//         {
+//             if (child.name == name)
+//                 return child;
+//             Transform found = FindChildByName(child.gameObject, name);
+//             if (found != null)
+//                 return found;
+//         }
+//         return null;
+//     }
+
+//     // ReplaceSelectedPoses clones the container for each selected raw image,
+//     // then clones corresponding video frames, assigns layers, and notifies the CameraManager.
 //     void ReplaceSelectedPoses()
 //     {
-//         // Remove rectangles from previously selected poses
 //         if (selectedPose1 != null) RemoveRectangleFromPose(selectedPose1);
 //         if (selectedPose2 != null) RemoveRectangleFromPose(selectedPose2);
 
-//         // Step 1: Clone the new poses and place them in the display positions
-//         GameObject newClonedPose1 = ClonePose(newPoseBuffer1, "modelMainset", new Vector3(-1.5f, 1.2f, 0f));
-//         GameObject newClonedPose2 = ClonePose(newPoseBuffer2, "modelAdd1set", new Vector3(1f, 1.2f, 0f));
+//         GameObject realPose1 = null;
+//         GameObject realPose2 = null;
+//         if (newPoseBuffer1 != null)
+//             rawImageToRealPose.TryGetValue(newPoseBuffer1, out realPose1);
+//         if (newPoseBuffer2 != null)
+//             rawImageToRealPose.TryGetValue(newPoseBuffer2, out realPose2);
 
-//         // Update selected poses
-//         selectedPose1 = newPoseBuffer1;
-//         selectedPose2 = newPoseBuffer2;
-
-//         // Notify the CameraManager with the names of the new cloned poses
-//         if (cameraManager != null)
+//         if (cameraManager != null && realPose1 != null && realPose2 != null)
 //         {
-//             string clonedPose1Name = newClonedPose1 != null ? newClonedPose1.name : null;
-//             string clonedPose2Name = newClonedPose2 != null ? newClonedPose2.name : null;
-//             cameraManager.UpdateSelectedPoseNames(clonedPose1Name, clonedPose2Name);
+//             // We will update with cloned pose names after cloning containers.
 //         }
 //         else
 //         {
-//             Debug.LogError("[StaticPoseSelector] CameraManager reference is missing.");
+//             Debug.LogError("[StaticPoseSelector] CameraManager reference is missing or real poses are null.");
 //         }
 
-//         // Notify the ForceAndTorqueVisualizer with the new cloned poses
-//         NotifyForceAndTorqueVisualizer(newClonedPose1, newClonedPose2);
+//         // Here, set the desired anchored positions for the cloned containers’ RawImages.
+//         // For this example, we ignore the dummy parameter.
+//         Vector2 desiredAnchoredPos1 = new Vector2(-31.3f, 9.9f); // For pose 1
+//         Vector2 desiredAnchoredPos2 = new Vector2(-76f, 17f);    // For pose 2
 
-//         // Step 3: Destroy the previously cloned poses (not the originals)
-//         if (clonedPose1 != null) Destroy(clonedPose1);
-//         if (clonedPose2 != null) Destroy(clonedPose2);
+//         GameObject containerClone1 = CloneContainerFromRawImage(newPoseBuffer1, Vector2.zero);
+//         GameObject containerClone2 = CloneContainerFromRawImage(newPoseBuffer2, Vector2.zero);
 
-//         // Step 4: Update the cloned poses references to the new clones
-//         clonedPose1 = newClonedPose1;
-//         clonedPose2 = newClonedPose2;
+//         // find the camera under containerclone1's and set it's cullingmask to modelMainset, and the one under containerClone2's cullingmask to modelAdd1set
+//         Camera clonedCamera1 = containerClone1.GetComponentInChildren<Camera>();
+//         Camera clonedCamera2 = containerClone2.GetComponentInChildren<Camera>();
+//         if (clonedCamera1 != null)
+//         {
+//             clonedCamera1.cullingMask = 1 << LayerMask.NameToLayer("modelMainset");
+//         }
+//         if (clonedCamera2 != null)
+//         {
+//             clonedCamera2.cullingMask = 1 << LayerMask.NameToLayer("modelAdd1set");
+//         }
 
-//         // Step 5: Reset the temporary buffers
+//         // Set the container clones' RectTransform anchored positions to the desired values.
+//         RectTransform rt1 = containerClone1.GetComponent<RectTransform>();
+//         if (rt1 != null)
+//             rt1.anchoredPosition = desiredAnchoredPos1;
+//             rt1.sizeDelta = new Vector2(30, 30);
+//         RectTransform rt2 = containerClone2.GetComponent<RectTransform>();
+//         if (rt2 != null)
+//             rt2.anchoredPosition = desiredAnchoredPos2;
+//             rt2.sizeDelta = new Vector2(30, 30);
+
+//         // Set layers: first container to "MainModel", second to "AdditionalModel".
+//         SetLayerRecursively(containerClone1, LayerMask.NameToLayer("modelMainset"));
+//         SetLayerRecursively(containerClone2, LayerMask.NameToLayer("modelAdd1set"));
+
+//         // Retrieve the cloned pose from each container (assumed to be the first child that contains the pose).
+//         GameObject clonedPoseFromContainer1 = FindChildByName(containerClone1, "mixamorig:Hips")?.transform.parent.gameObject;
+//         GameObject clonedPoseFromContainer2 = FindChildByName(containerClone2, "mixamorig:Hips")?.transform.parent.gameObject;
+
+//         if (cameraManager != null && clonedPoseFromContainer1 != null && clonedPoseFromContainer2 != null)
+//         {
+//             cameraManager.UpdateSelectedPoseNames(clonedPoseFromContainer1.name, clonedPoseFromContainer2.name);
+//         }
+//         else
+//         {
+//             Debug.LogError("[StaticPoseSelector] CameraManager reference is missing or cloned poses are null.");
+//         }
+
+//         // Clone corresponding video frames.
+//         GameObject frameClone1 = CloneCorrespondingFrame(newPoseBuffer1, new Vector2(-843, 373), new Vector2(400, 250));
+//         GameObject frameClone2 = CloneCorrespondingFrame(newPoseBuffer2, new Vector2(-430, 373), new Vector2(400, 250));
+
+//         if (canvasResultMotionParent != null)
+//         {
+//             if (containerClone1 != null)
+//                 containerClone1.transform.SetParent(canvasResultMotionParent.transform, false);
+//             if (containerClone2 != null)
+//                 containerClone2.transform.SetParent(canvasResultMotionParent.transform, false);
+//             if (frameClone1 != null)
+//                 frameClone1.transform.SetParent(canvasResultMotionParent.transform, false);
+//             if (frameClone2 != null)
+//                 frameClone2.transform.SetParent(canvasResultMotionParent.transform, false);
+//         }
+//         else
+//         {
+//             Debug.LogError("[StaticPoseSelector] canvasResultMotionParent is not assigned.");
+//         }
+
+//         selectedPose1 = realPose1;
+//         selectedPose2 = realPose2;
+//         NotifyForceAndTorqueVisualizer(selectedPose1, selectedPose2);
+
+//         if (clonedContainer1 != null) Destroy(clonedContainer1);
+//         if (clonedContainer2 != null) Destroy(clonedContainer2);
+
+//         clonedContainer1 = containerClone1;
+//         clonedContainer2 = containerClone2;
+
 //         ResetNewPoseBuffer();
 //     }
 
-//     GameObject ClonePose(GameObject poseBuffer, string layerName, Vector3 displayPosition)
+//     GameObject CloneCorrespondingFrame(GameObject rawImage, Vector2 anchoredPosition, Vector2 sizeDelta)
 //     {
-//         if (poseBuffer == null) return null;
-
-//         // Clone the pose
-//         GameObject clonedPose = Instantiate(poseBuffer, Vector3.zero, Quaternion.identity);
-//         clonedPose.name = $"{poseBuffer.name}_Cloned_{poseCounter++}";
-//         SetLayerRecursively(clonedPose, LayerMask.NameToLayer(layerName));
-//         clonedPose.transform.Rotate(180, 180, 0); // Adjust orientation
-//         clonedPose.tag = "Untagged";
-//         clonedPose.transform.SetParent(motionParent.transform);
-
-//         // Remove the "_Rectangle" child from the clone
-//         RemoveChildByName(clonedPose, $"{poseBuffer.name}_Rectangle");
-
-//         // Adjust the root position so the mixamorig:Hips position matches the original
-//         AlignPoseHips(poseBuffer, clonedPose, displayPosition);
-
-//         // Adjust LineRenderer positions for AngleArc
-//         AdjustAngleArcLineRenderer(poseBuffer, clonedPose);
-
-//         return clonedPose;
-//     }
-
-//     void RemoveChildByName(GameObject parent, string childName)
-//     {
-//         Transform child = parent.transform.Find(childName);
-//         if (child != null) Destroy(child.gameObject);
-//     }
-
-//     void AlignPoseHips(GameObject originalPose, GameObject clonedPose, Vector3 displayPosition)
-//     {
-//         Transform originalHips = originalPose.transform.Find("mixamorig:Hips");
-//         Transform clonedHips = clonedPose.transform.Find("mixamorig:Hips");
-
-//         if (originalHips != null && clonedHips != null)
+//         if (!rawImageToRealPose.TryGetValue(rawImage, out GameObject realPose))
 //         {
-//             Vector3 hipsOffset = originalHips.position - originalPose.transform.position;
-//             clonedPose.transform.position = displayPosition - hipsOffset;
+//             Debug.LogWarning($"No real pose found for raw image '{rawImage.name}' when cloning frame.");
+//             return null;
+//         }
+//         string playerName = GetPlayerNameFromPoseName(realPose.name);
+//         int frameNumber = GetFrameNumberFromPoseName(realPose.name);
+//         GameObject correspondingFrame = FindCorrespondingFrame(playerName, frameNumber);
+//         if (correspondingFrame != null)
+//         {
+//             Debug.Log($"[StaticPoseSelector] Corresponding frame found for Player: {playerName}, Frame: {frameNumber}");
+//             GameObject clonedFrame = Instantiate(correspondingFrame);
+//             clonedFrame.name = $"{correspondingFrame.name}_Clone_{playerName}";
+//             RectTransform rt = clonedFrame.GetComponent<RectTransform>();
+//             if (rt != null)
+//             {
+//                 rt.anchoredPosition = anchoredPosition;
+//                 rt.sizeDelta = sizeDelta;
+//             }
+//             return clonedFrame;
 //         }
 //         else
 //         {
-//             Debug.LogWarning("[StaticPoseSelector] mixamorig:Hips not found on one of the poses.");
+//             Debug.LogWarning($"[StaticPoseSelector] Corresponding frame not found for Player: {playerName}, Frame: {frameNumber}");
+//             return null;
 //         }
 //     }
 
-//     void AdjustAngleArcLineRenderer(GameObject originalPose, GameObject clonedPose)
+//     private string GetPlayerNameFromPoseName(string poseName)
 //     {
-//         Transform originalAngleArc = originalPose.transform.Find("AngleArc");
-//         Transform originalHips = originalPose.transform.Find("mixamorig:Hips");
-//         Transform clonedAngleArc = clonedPose.transform.Find("AngleArc");
-//         Transform clonedHips = clonedPose.transform.Find("mixamorig:Hips");
+//         string[] parts = poseName.Split('_');
+//         return parts.Length > 0 ? parts[0] : null;
+//     }
 
-//         if (originalAngleArc == null || originalHips == null || clonedAngleArc == null || clonedHips == null)
+//     private int GetFrameNumberFromPoseName(string poseName)
+//     {
+//         string[] parts = poseName.Split('_');
+//         if (parts.Length > 2 && int.TryParse(parts[2], out int frameNum))
+//             return frameNum;
+//         return -1;
+//     }
+
+//     private GameObject FindCorrespondingFrame(string playerName, int frameNumber)
+//     {
+//         GameObject canvasObject = GameObject.Find("CanvasSetup");
+//         if (canvasObject == null)
 //         {
-//             Debug.LogWarning("Could not find AngleArc or mixamorig:Hips in the original or cloned poses.");
-//             return;
+//             Debug.LogError("[StaticPoseSelector] Canvas named 'CanvasSetup' not found.");
+//             return null;
 //         }
-
-//         LineRenderer originalLineRenderer = originalAngleArc.GetComponent<LineRenderer>();
-//         LineRenderer clonedLineRenderer = clonedAngleArc.GetComponent<LineRenderer>();
-
-//         if (originalLineRenderer == null || clonedLineRenderer == null)
+//         Canvas canvasSetup = canvasObject.GetComponent<Canvas>();
+//         if (canvasSetup == null)
 //         {
-//             Debug.LogWarning("LineRenderer not found on AngleArc in original or cloned object.");
-//             return;
+//             Debug.LogError("[StaticPoseSelector] 'CanvasSetup' does not have a Canvas component.");
+//             return null;
 //         }
-
-//         // Get the positions of the LineRenderer in world space
-//         int positionCount = originalLineRenderer.positionCount;
-//         Vector3[] originalPositions = new Vector3[positionCount];
-//         originalLineRenderer.GetPositions(originalPositions);
-
-//         // Calculate relative positions of the LineRenderer points to original mixamorig:Hips
-//         Vector3[] relativePositions = new Vector3[positionCount];
-//         for (int i = 0; i < positionCount; i++)
+//         Transform videoContainer = canvasSetup.transform.Find("VideoContainer");
+//         if (videoContainer == null)
 //         {
-//             relativePositions[i] = originalHips.InverseTransformPoint(originalPositions[i]);
+//             Debug.LogError("[StaticPoseSelector] VideoContainer not found.");
+//             return null;
 //         }
-
-//         // Apply the relative positions to the cloned LineRenderer
-//         Vector3[] clonedPositions = new Vector3[positionCount];
-//         for (int i = 0; i < positionCount; i++)
+//         string playerVideoContainerName = $"{playerName}Video";
+//         Transform playerVideoContainer = videoContainer.Find(playerVideoContainerName);
+//         if (playerVideoContainer == null)
 //         {
-//             clonedPositions[i] = clonedHips.TransformPoint(relativePositions[i]);
+//             Debug.LogError($"[StaticPoseSelector] VideoContainer for Player '{playerName}' not found.");
+//             return null;
 //         }
+//         Transform frameCont = null;
+//         foreach (Transform child in playerVideoContainer)
+//         {
+//             if (child.name.StartsWith("FrameContainer"))
+//             {
+//                 frameCont = child;
+//                 break;
+//             }
+//         }
+//         if (frameCont == null)
+//         {
+//             Debug.LogError($"[StaticPoseSelector] FrameContainer not found under {playerVideoContainerName}.");
+//             return null;
+//         }
+//         string frameName = $"Frame_{frameNumber}";
+//         Transform frame = frameCont.Find(frameName);
+//         if (frame == null)
+//         {
+//             Debug.LogError($"[StaticPoseSelector] Frame '{frameName}' not found in FrameContainer.");
+//             return null;
+//         }
+//         return frame.gameObject;
+//     }
 
-//         clonedLineRenderer.SetPositions(clonedPositions);
+//     void AdjustHipJointRotation()
+//     {
+//         Transform hipJoint1 = clonedContainer1.transform.Find("mixamorig:Hips");
+//         Transform hipJoint2 = clonedContainer2.transform.Find("mixamorig:Hips");
+//         if (hipJoint1 != null && hipJoint2 != null)
+//         {
+//             hipJoint2.rotation = hipJoint1.rotation;
+//             Debug.Log("[StaticPoseSelector] Hip joint rotation of Pose 2 matched to Pose 1.");
+//         }
+//         else
+//         {
+//             Debug.LogWarning("[StaticPoseSelector] Could not find hip joint in one or both poses.");
+//         }
+//     }
+
+//     void NotifyForceAndTorqueVisualizer(GameObject pose1, GameObject pose2)
+//     {
+//         if (forceAndTorqueVisualizer != null)
+//         {
+//             forceAndTorqueVisualizer.SetPoses(pose1, pose2);
+//             Debug.Log("[StaticPoseSelector] ForceAndTorqueVisualizer updated with new poses.");
+//         }
+//         else
+//         {
+//             Debug.LogError("[StaticPoseSelector] ForceAndTorqueVisualizer reference is missing.");
+//         }
 //     }
 
 //     void SetLayerRecursively(GameObject obj, int layer)
@@ -332,15 +474,486 @@
 //         }
 //     }
 
-//     void InformCameraManager()
+//     void RemoveChildByName(GameObject parent, string childName)
 //     {
-//         if (cameraManager != null)
+//         Transform child = parent.transform.Find(childName);
+//         if (child != null)
+//             Destroy(child.gameObject);
+//     }
+
+//     void AdjustAngleArcLineRenderer(GameObject originalPose, GameObject clonedPose)
+//     {
+//         Transform originalAngleArc = originalPose.transform.Find("AngleArc");
+//         Transform originalHips = originalPose.transform.Find("mixamorig:Hips");
+//         Transform clonedAngleArc = clonedPose.transform.Find("AngleArc");
+//         Transform clonedHips = clonedPose.transform.Find("mixamorig:Hips");
+//         if (originalAngleArc == null || originalHips == null || clonedAngleArc == null || clonedHips == null)
 //         {
-//             cameraManager.UpdateSelectedPoseNames(clonedPose1.name, clonedPose2.name);
+//             Debug.LogWarning("Could not find AngleArc or mixamorig:Hips in the original or cloned poses.");
+//             return;
+//         }
+//         LineRenderer originalLineRenderer = originalAngleArc.GetComponent<LineRenderer>();
+//         LineRenderer clonedLineRenderer = clonedAngleArc.GetComponent<LineRenderer>();
+//         if (originalLineRenderer == null || clonedLineRenderer == null)
+//         {
+//             Debug.LogWarning("LineRenderer not found on AngleArc in original or cloned object.");
+//             return;
+//         }
+//         int positionCount = originalLineRenderer.positionCount;
+//         Vector3[] originalPositions = new Vector3[positionCount];
+//         originalLineRenderer.GetPositions(originalPositions);
+//         Vector3[] relativePositions = new Vector3[positionCount];
+//         for (int i = 0; i < positionCount; i++)
+//         {
+//             relativePositions[i] = originalHips.InverseTransformPoint(originalPositions[i]);
+//         }
+//         Vector3[] clonedPositions = new Vector3[positionCount];
+//         for (int i = 0; i < positionCount; i++)
+//         {
+//             clonedPositions[i] = clonedHips.TransformPoint(relativePositions[i]);
+//         }
+//         clonedLineRenderer.SetPositions(clonedPositions);
+//     }
+// }
+
+
+
+// using System.Collections.Generic;
+// using UnityEngine;
+// using UnityEngine.UI;
+// using UnityEngine.EventSystems;
+
+// public class StaticPoseSelector : MonoBehaviour
+// {
+//     public static StaticPoseSelector Instance;
+
+//     public List<GameObject> staticPoses = new List<GameObject>(); // RawImages tagged "StaticPose"
+//     public GameObject selectedPose1; // Associated real pose for selection 1
+//     public GameObject selectedPose2; // Associated real pose for selection 2
+
+//     private Camera mainCamera;
+
+//     private GameObject clonedContainer1; // Cloned container for selection 1 (contains pose, camera, RawImage)
+//     private GameObject clonedContainer2; // Cloned container for selection 2
+
+//     public CameraManager cameraManager; // Assign via Inspector
+//     public ForceAndTorqueVisualizer forceAndTorqueVisualizer; // Reference to ForceAndTorqueVisualizer
+
+//     // Parent for the raw images used during selection (contains containers with real poses and preview cameras)
+//     public GameObject motionParent;
+
+//     // Parent under the CanvasResult where the cloned containers and video frames will be placed
+//     public GameObject canvasResultMotionParent;
+
+//     // Buffers to store the selected RawImage (the clickable UI element)
+//     private GameObject newPoseBuffer1;
+//     private GameObject newPoseBuffer2;
+
+//     private int poseCounter = 0; // For unique naming
+
+//     // Dictionary to store bounding box objects for each real pose
+//     private Dictionary<GameObject, GameObject> poseRectangles = new Dictionary<GameObject, GameObject>();
+
+//     // Dictionary mapping each clickable RawImage to its corresponding real pose.
+//     public Dictionary<GameObject, GameObject> rawImageToRealPose = new Dictionary<GameObject, GameObject>();
+
+//     public void AddRawImageToPoseMapping(GameObject rawImage, GameObject realPose)
+//     {
+//         rawImageToRealPose[rawImage] = realPose;
+//     }
+
+//     void Awake()
+//     {
+//         Instance = this;
+//     }
+
+//     void Start()
+//     {
+//         mainCamera = Camera.main;
+//         staticPoses.AddRange(GameObject.FindGameObjectsWithTag("StaticPose"));
+//         foreach (var rawImageObj in staticPoses)
+//         {
+//             if (rawImageObj.GetComponent<BoxCollider>() == null)
+//                 rawImageObj.AddComponent<BoxCollider>();
+//             if (rawImageObj.GetComponent<RawImageClickHandler>() == null)
+//                 rawImageObj.AddComponent<RawImageClickHandler>();
+//         }
+//         if (cameraManager == null)
+//         {
+//             cameraManager = FindObjectOfType<CameraManager>();
+//             if (cameraManager == null)
+//                 Debug.LogError("[StaticPoseSelector] CameraManager not found. Please assign it in the Inspector.");
+//         }
+//     }
+
+//     // Called by RawImageClickHandler when a RawImage is clicked.
+//     public void HandleRawImageClick(GameObject clickedRawImage)
+//     {
+//         Debug.Log($"[StaticPoseSelector] RawImage clicked: {clickedRawImage.name}");
+//         if (!rawImageToRealPose.TryGetValue(clickedRawImage, out GameObject realPose))
+//         {
+//             Debug.LogWarning($"No real pose found for raw image '{clickedRawImage.name}'.");
+//             return;
+//         }
+//         AddRectangleToPose(realPose);
+//         if (newPoseBuffer1 == null)
+//         {
+//             newPoseBuffer1 = clickedRawImage;
+//             Debug.Log($"[StaticPoseSelector] New Pose 1 selected (RawImage): {clickedRawImage.name}");
+//         }
+//         else if (newPoseBuffer2 == null)
+//         {
+//             newPoseBuffer2 = clickedRawImage;
+//             Debug.Log($"[StaticPoseSelector] New Pose 2 selected (RawImage): {clickedRawImage.name}");
+//             ReplaceSelectedPoses();
+//             AdjustHipJointRotation();
 //         }
 //         else
 //         {
-//             Debug.LogError("[StaticPoseSelector] CameraManager reference is missing.");
+//             Debug.Log("[StaticPoseSelector] More than two selections detected. Resetting selection.");
+//             ResetNewPoseBuffer();
+//         }
+//     }
+
+//     void AddRectangleToPose(GameObject pose)
+//     {
+//         if (poseRectangles.ContainsKey(pose))
+//             return;
+//         Transform hipsTransform = pose.transform.Find("mixamorig:Hips");
+//         if (hipsTransform == null)
+//         {
+//             Debug.LogWarning($"[StaticPoseSelector] mixamorig:Hips not found in {pose.name}. Rectangle not added.");
+//             return;
+//         }
+//         GameObject rectangle = new GameObject($"{pose.name}_Rectangle");
+//         rectangle.transform.SetParent(pose.transform);
+//         rectangle.transform.position = hipsTransform.position;
+//         LineRenderer lr = rectangle.AddComponent<LineRenderer>();
+//         lr.positionCount = 5;
+//         lr.startWidth = 0.02f;
+//         lr.endWidth = 0.02f;
+//         lr.useWorldSpace = true;
+//         float rectW = 1.0f, rectH = 1.5f;
+//         Vector3[] corners = new Vector3[]
+//         {
+//             hipsTransform.position + new Vector3(-rectW/2, -rectH/2, 0),
+//             hipsTransform.position + new Vector3(rectW/2, -rectH/2, 0),
+//             hipsTransform.position + new Vector3(rectW/2, rectH/2, 0),
+//             hipsTransform.position + new Vector3(-rectW/2, rectH/2, 0),
+//             hipsTransform.position + new Vector3(-rectW/2, -rectH/2, 0)
+//         };
+//         lr.SetPositions(corners);
+//         lr.material = new Material(Shader.Find("Sprites/Default"));
+//         lr.startColor = Color.red;
+//         lr.endColor = Color.red;
+//         rectangle.layer = pose.layer;
+//         poseRectangles[pose] = rectangle;
+//     }
+
+//     void RemoveRectangleFromPose(GameObject pose)
+//     {
+//         if (poseRectangles.ContainsKey(pose))
+//         {
+//             Destroy(poseRectangles[pose]);
+//             poseRectangles.Remove(pose);
+//         }
+//     }
+
+//     void ResetNewPoseBuffer()
+//     {
+//         newPoseBuffer1 = null;
+//         newPoseBuffer2 = null;
+//     }
+
+//     GameObject CloneContainerFromRawImage(GameObject rawImageSource, Vector2 dummy) // dummy parameter not used
+//     {
+//         if (rawImageSource == null)
+//             return null;
+
+//         if (!rawImageToRealPose.TryGetValue(rawImageSource, out GameObject realPose))
+//         {
+//             Debug.LogWarning("No real pose found for the given raw image.");
+//             return null;
+//         }
+
+//         Transform originalContainer = realPose.transform.parent;
+//         if (originalContainer == null)
+//         {
+//             Debug.LogWarning("Real pose has no parent container.");
+//             return null;
+//         }
+
+//         GameObject containerClone = Instantiate(originalContainer.gameObject);
+//         containerClone.name = originalContainer.gameObject.name + "_Clone_" + poseCounter++;
+
+//         // Remove any children whose names contain "_Rectangle" from the clone.
+//         foreach (Transform child in containerClone.GetComponentsInChildren<Transform>())
+//         {
+//             if (child.name.Contains("_Rectangle"))
+//                 Destroy(child.gameObject);
+//         }
+
+//         // Remove the old RawImage from the clone.
+//         RawImage oldRaw = containerClone.GetComponentInChildren<RawImage>();
+//         if (oldRaw != null)
+//             Destroy(oldRaw.gameObject);
+
+//         // Set the container's RectTransform anchored position.
+//         RectTransform containerRT = containerClone.GetComponent<RectTransform>();
+//         // (We later set the container's anchored position in ReplaceSelectedPoses, so no need to set here)
+
+//         // Find the preview camera in the cloned container.
+//         Camera clonedCamera = containerClone.GetComponentInChildren<Camera>();
+//         if (clonedCamera == null)
+//         {
+//             Debug.LogWarning("No preview camera found in cloned container.");
+//             return containerClone;
+//         }
+//         // set the camera's cullingmask to layer "modelMainset" and modelAdd1set
+//         clonedCamera.cullingMask = 1 << LayerMask.NameToLayer("modelMainset") | 1 << LayerMask.NameToLayer("modelAdd1set");
+
+//         // Create a new RenderTexture and assign it to the cloned camera.
+//         RenderTexture newRT = new RenderTexture(1024, 1024, 16);
+//         clonedCamera.targetTexture = newRT;
+
+//         // Create a new RawImage for the cloned camera.
+//         GameObject newRawImgObj = new GameObject(containerClone.name + "_RawImage");
+//         RawImage newRawImg = newRawImgObj.AddComponent<RawImage>();
+//         newRawImg.texture = newRT;
+//         RectTransform rawImgRT = newRawImg.GetComponent<RectTransform>();
+//         rawImgRT.sizeDelta = new Vector2(30, 30);
+//         // We will set the anchored position later in ReplaceSelectedPoses.
+//         newRawImgObj.tag = "StaticPose";
+//         if (newRawImgObj.GetComponent<RawImageClickHandler>() == null)
+//             newRawImgObj.AddComponent<RawImageClickHandler>();
+
+//         newRawImgObj.transform.SetParent(containerClone.transform, false);
+
+//         // Set the "mixamorig:Hips" child's local Y position to 0.
+//         Transform hips = FindChildByName(containerClone, "mixamorig:Hips");
+//         if (hips != null)
+//         {
+//             Vector3 pos = hips.localPosition;
+//             hips.localPosition = new Vector3(pos.x, 0f, pos.z);
+//         }
+//         else
+//         {
+//             Debug.LogWarning("mixamorig:Hips not found in cloned container.");
+//         }
+
+//         return containerClone;
+//     }
+
+//     // Helper: Recursively finds a child by name.
+//     Transform FindChildByName(GameObject parent, string name)
+//     {
+//         foreach (Transform child in parent.transform)
+//         {
+//             if (child.name == name)
+//                 return child;
+//             Transform found = FindChildByName(child.gameObject, name);
+//             if (found != null)
+//                 return found;
+//         }
+//         return null;
+//     }
+
+//     // ReplaceSelectedPoses clones the container for each selected raw image,
+//     // then clones corresponding video frames, assigns layers, and notifies the CameraManager.
+//     void ReplaceSelectedPoses()
+//     {
+//         if (selectedPose1 != null) RemoveRectangleFromPose(selectedPose1);
+//         if (selectedPose2 != null) RemoveRectangleFromPose(selectedPose2);
+
+//         GameObject realPose1 = null;
+//         GameObject realPose2 = null;
+//         if (newPoseBuffer1 != null)
+//             rawImageToRealPose.TryGetValue(newPoseBuffer1, out realPose1);
+//         if (newPoseBuffer2 != null)
+//             rawImageToRealPose.TryGetValue(newPoseBuffer2, out realPose2);
+
+//         if (cameraManager != null && realPose1 != null && realPose2 != null)
+//         {
+//             // We will update with cloned pose names after cloning containers.
+//         }
+//         else
+//         {
+//             Debug.LogError("[StaticPoseSelector] CameraManager reference is missing or real poses are null.");
+//         }
+
+//         // Here, set the desired anchored positions for the cloned containers’ RawImages.
+//         // For this example, we ignore the dummy parameter.
+//         Vector2 desiredAnchoredPos1 = new Vector2(-31.3f, 9.9f); // For pose 1
+//         Vector2 desiredAnchoredPos2 = new Vector2(-76f, 17f);    // For pose 2
+
+//         GameObject containerClone1 = CloneContainerFromRawImage(newPoseBuffer1, Vector2.zero);
+//         GameObject containerClone2 = CloneContainerFromRawImage(newPoseBuffer2, Vector2.zero);
+
+//         // Set the container clones' RectTransform anchored positions to the desired values.
+//         RectTransform rt1 = containerClone1.GetComponent<RectTransform>();
+//         if (rt1 != null)
+//             rt1.anchoredPosition = desiredAnchoredPos1;
+//         RectTransform rt2 = containerClone2.GetComponent<RectTransform>();
+//         if (rt2 != null)
+//             rt2.anchoredPosition = desiredAnchoredPos2;
+
+//         // Set layers: first container to "MainModel", second to "AdditionalModel".
+//         SetLayerRecursively(containerClone1, LayerMask.NameToLayer("modelMainset"));
+//         SetLayerRecursively(containerClone2, LayerMask.NameToLayer("modelAdd1set"));
+
+//         // Retrieve the cloned pose from each container (assumed to be the first child that contains the pose).
+//         GameObject clonedPoseFromContainer1 = FindChildByName(containerClone1, "mixamorig:Hips")?.transform.parent.gameObject;
+//         GameObject clonedPoseFromContainer2 = FindChildByName(containerClone2, "mixamorig:Hips")?.transform.parent.gameObject;
+
+//         if (cameraManager != null && clonedPoseFromContainer1 != null && clonedPoseFromContainer2 != null)
+//         {
+//             cameraManager.UpdateSelectedPoseNames(clonedPoseFromContainer1.name, clonedPoseFromContainer2.name);
+//         }
+//         else
+//         {
+//             Debug.LogError("[StaticPoseSelector] CameraManager reference is missing or cloned poses are null.");
+//         }
+
+//         // Clone corresponding video frames.
+//         GameObject frameClone1 = CloneCorrespondingFrame(newPoseBuffer1, new Vector2(-843, 373), new Vector2(400, 250));
+//         GameObject frameClone2 = CloneCorrespondingFrame(newPoseBuffer2, new Vector2(-430, 373), new Vector2(400, 250));
+
+//         if (canvasResultMotionParent != null)
+//         {
+//             if (containerClone1 != null)
+//                 containerClone1.transform.SetParent(canvasResultMotionParent.transform, false);
+//             if (containerClone2 != null)
+//                 containerClone2.transform.SetParent(canvasResultMotionParent.transform, false);
+//             if (frameClone1 != null)
+//                 frameClone1.transform.SetParent(canvasResultMotionParent.transform, false);
+//             if (frameClone2 != null)
+//                 frameClone2.transform.SetParent(canvasResultMotionParent.transform, false);
+//         }
+//         else
+//         {
+//             Debug.LogError("[StaticPoseSelector] canvasResultMotionParent is not assigned.");
+//         }
+
+//         selectedPose1 = realPose1;
+//         selectedPose2 = realPose2;
+//         NotifyForceAndTorqueVisualizer(selectedPose1, selectedPose2);
+
+//         if (clonedContainer1 != null) Destroy(clonedContainer1);
+//         if (clonedContainer2 != null) Destroy(clonedContainer2);
+
+//         clonedContainer1 = containerClone1;
+//         clonedContainer2 = containerClone2;
+
+//         ResetNewPoseBuffer();
+//     }
+
+//     GameObject CloneCorrespondingFrame(GameObject rawImage, Vector2 anchoredPosition, Vector2 sizeDelta)
+//     {
+//         if (!rawImageToRealPose.TryGetValue(rawImage, out GameObject realPose))
+//         {
+//             Debug.LogWarning($"No real pose found for raw image '{rawImage.name}' when cloning frame.");
+//             return null;
+//         }
+//         string playerName = GetPlayerNameFromPoseName(realPose.name);
+//         int frameNumber = GetFrameNumberFromPoseName(realPose.name);
+//         GameObject correspondingFrame = FindCorrespondingFrame(playerName, frameNumber);
+//         if (correspondingFrame != null)
+//         {
+//             Debug.Log($"[StaticPoseSelector] Corresponding frame found for Player: {playerName}, Frame: {frameNumber}");
+//             GameObject clonedFrame = Instantiate(correspondingFrame);
+//             clonedFrame.name = $"{correspondingFrame.name}_Clone_{playerName}";
+//             RectTransform rt = clonedFrame.GetComponent<RectTransform>();
+//             if (rt != null)
+//             {
+//                 rt.anchoredPosition = anchoredPosition;
+//                 rt.sizeDelta = sizeDelta;
+//             }
+//             return clonedFrame;
+//         }
+//         else
+//         {
+//             Debug.LogWarning($"[StaticPoseSelector] Corresponding frame not found for Player: {playerName}, Frame: {frameNumber}");
+//             return null;
+//         }
+//     }
+
+//     private string GetPlayerNameFromPoseName(string poseName)
+//     {
+//         string[] parts = poseName.Split('_');
+//         return parts.Length > 0 ? parts[0] : null;
+//     }
+
+//     private int GetFrameNumberFromPoseName(string poseName)
+//     {
+//         string[] parts = poseName.Split('_');
+//         if (parts.Length > 2 && int.TryParse(parts[2], out int frameNum))
+//             return frameNum;
+//         return -1;
+//     }
+
+//     private GameObject FindCorrespondingFrame(string playerName, int frameNumber)
+//     {
+//         GameObject canvasObject = GameObject.Find("CanvasSetup");
+//         if (canvasObject == null)
+//         {
+//             Debug.LogError("[StaticPoseSelector] Canvas named 'CanvasSetup' not found.");
+//             return null;
+//         }
+//         Canvas canvasSetup = canvasObject.GetComponent<Canvas>();
+//         if (canvasSetup == null)
+//         {
+//             Debug.LogError("[StaticPoseSelector] 'CanvasSetup' does not have a Canvas component.");
+//             return null;
+//         }
+//         Transform videoContainer = canvasSetup.transform.Find("VideoContainer");
+//         if (videoContainer == null)
+//         {
+//             Debug.LogError("[StaticPoseSelector] VideoContainer not found.");
+//             return null;
+//         }
+//         string playerVideoContainerName = $"{playerName}Video";
+//         Transform playerVideoContainer = videoContainer.Find(playerVideoContainerName);
+//         if (playerVideoContainer == null)
+//         {
+//             Debug.LogError($"[StaticPoseSelector] VideoContainer for Player '{playerName}' not found.");
+//             return null;
+//         }
+//         Transform frameCont = null;
+//         foreach (Transform child in playerVideoContainer)
+//         {
+//             if (child.name.StartsWith("FrameContainer"))
+//             {
+//                 frameCont = child;
+//                 break;
+//             }
+//         }
+//         if (frameCont == null)
+//         {
+//             Debug.LogError($"[StaticPoseSelector] FrameContainer not found under {playerVideoContainerName}.");
+//             return null;
+//         }
+//         string frameName = $"Frame_{frameNumber}";
+//         Transform frame = frameCont.Find(frameName);
+//         if (frame == null)
+//         {
+//             Debug.LogError($"[StaticPoseSelector] Frame '{frameName}' not found in FrameContainer.");
+//             return null;
+//         }
+//         return frame.gameObject;
+//     }
+
+//     void AdjustHipJointRotation()
+//     {
+//         Transform hipJoint1 = clonedContainer1.transform.Find("mixamorig:Hips");
+//         Transform hipJoint2 = clonedContainer2.transform.Find("mixamorig:Hips");
+//         if (hipJoint1 != null && hipJoint2 != null)
+//         {
+//             hipJoint2.rotation = hipJoint1.rotation;
+//             Debug.Log("[StaticPoseSelector] Hip joint rotation of Pose 2 matched to Pose 1.");
+//         }
+//         else
+//         {
+//             Debug.LogWarning("[StaticPoseSelector] Could not find hip joint in one or both poses.");
 //         }
 //     }
 
@@ -350,184 +963,198 @@
 //         {
 //             forceAndTorqueVisualizer.SetPoses(pose1, pose2);
 //             Debug.Log("[StaticPoseSelector] ForceAndTorqueVisualizer updated with new poses.");
-
 //         }
 //         else
 //         {
 //             Debug.LogError("[StaticPoseSelector] ForceAndTorqueVisualizer reference is missing.");
 //         }
 //     }
+
+//     void SetLayerRecursively(GameObject obj, int layer)
+//     {
+//         obj.layer = layer;
+//         foreach (Transform child in obj.transform)
+//         {
+//             SetLayerRecursively(child.gameObject, layer);
+//         }
+//     }
+
+//     void RemoveChildByName(GameObject parent, string childName)
+//     {
+//         Transform child = parent.transform.Find(childName);
+//         if (child != null)
+//             Destroy(child.gameObject);
+//     }
+
+//     void AdjustAngleArcLineRenderer(GameObject originalPose, GameObject clonedPose)
+//     {
+//         Transform originalAngleArc = originalPose.transform.Find("AngleArc");
+//         Transform originalHips = originalPose.transform.Find("mixamorig:Hips");
+//         Transform clonedAngleArc = clonedPose.transform.Find("AngleArc");
+//         Transform clonedHips = clonedPose.transform.Find("mixamorig:Hips");
+//         if (originalAngleArc == null || originalHips == null || clonedAngleArc == null || clonedHips == null)
+//         {
+//             Debug.LogWarning("Could not find AngleArc or mixamorig:Hips in the original or cloned poses.");
+//             return;
+//         }
+//         LineRenderer originalLineRenderer = originalAngleArc.GetComponent<LineRenderer>();
+//         LineRenderer clonedLineRenderer = clonedAngleArc.GetComponent<LineRenderer>();
+//         if (originalLineRenderer == null || clonedLineRenderer == null)
+//         {
+//             Debug.LogWarning("LineRenderer not found on AngleArc in original or cloned object.");
+//             return;
+//         }
+//         int positionCount = originalLineRenderer.positionCount;
+//         Vector3[] originalPositions = new Vector3[positionCount];
+//         originalLineRenderer.GetPositions(originalPositions);
+//         Vector3[] relativePositions = new Vector3[positionCount];
+//         for (int i = 0; i < positionCount; i++)
+//         {
+//             relativePositions[i] = originalHips.InverseTransformPoint(originalPositions[i]);
+//         }
+//         Vector3[] clonedPositions = new Vector3[positionCount];
+//         for (int i = 0; i < positionCount; i++)
+//         {
+//             clonedPositions[i] = clonedHips.TransformPoint(relativePositions[i]);
+//         }
+//         clonedLineRenderer.SetPositions(clonedPositions);
+//     }
 // }
+
 
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
+using UnityEngine.EventSystems;
+using System.Linq;
 
 public class StaticPoseSelector : MonoBehaviour
 {
-    public List<GameObject> staticPoses = new List<GameObject>();
-    public GameObject selectedPose1;
-    public GameObject selectedPose2;
+    public static StaticPoseSelector Instance;
+
+    public List<GameObject> staticPoses = new List<GameObject>(); // RawImages tagged "StaticPose"
+    public GameObject selectedPose1; // Associated real pose for selection 1
+    public GameObject selectedPose2; // Associated real pose for selection 2
 
     private Camera mainCamera;
+
+    private GameObject clonedContainer1; // Cloned container for selection 1 (contains pose, camera, RawImage)
+    private GameObject clonedContainer2; // Cloned container for selection 2
 
     private GameObject clonedPose1;
     private GameObject clonedPose2;
 
-    public CameraManager cameraManager; // Assign this in the Inspector
-    public ForceAndTorqueVisualizer forceAndTorqueVisualizer; // Reference to the ForceAndTorqueVisualizer script
+    public CameraManager cameraManager; // Assign via Inspector
+    public ForceAndTorqueVisualizer forceAndTorqueVisualizer; // Reference to ForceAndTorqueVisualizer
 
+    // Parent for the raw images used during selection (contains containers with real poses and preview cameras)
     public GameObject motionParent;
 
+    // Parent under the CanvasResult where the cloned containers and video frames will be placed
+    public GameObject canvasResultMotionParent;
+
+    // Buffers to store the selected RawImage (the clickable UI element)
     private GameObject newPoseBuffer1;
     private GameObject newPoseBuffer2;
 
-    private int poseCounter = 0; // Counter for unique pose names
+    private int poseCounter = 0; // For unique naming
 
-    private Dictionary<GameObject, GameObject> poseRectangles = new Dictionary<GameObject, GameObject>(); // To store rectangles for poses
+    // Dictionary to store bounding box objects for each real pose
+    private Dictionary<GameObject, GameObject> poseRectangles = new Dictionary<GameObject, GameObject>();
+
+    // Dictionary mapping each clickable RawImage to its corresponding real pose.
+    public Dictionary<GameObject, GameObject> rawImageToRealPose = new Dictionary<GameObject, GameObject>();
+
+    public void AddRawImageToPoseMapping(GameObject rawImage, GameObject realPose)
+    {
+        rawImageToRealPose[rawImage] = realPose;
+    }
+
+    void Awake()
+    {
+        Instance = this;
+    }
 
     void Start()
     {
         mainCamera = Camera.main;
-
         staticPoses.AddRange(GameObject.FindGameObjectsWithTag("StaticPose"));
-
-        foreach (var pose in staticPoses)
+        foreach (var rawImageObj in staticPoses)
         {
-            BoxCollider collider = pose.GetComponent<BoxCollider>();
-            if (collider == null)
-            {
-                collider = pose.AddComponent<BoxCollider>();
-            }
-            collider.size = new Vector3(1, 1, 1);
+            if (rawImageObj.GetComponent<BoxCollider>() == null)
+                rawImageObj.AddComponent<BoxCollider>();
+            if (rawImageObj.GetComponent<RawImageClickHandler>() == null)
+                rawImageObj.AddComponent<RawImageClickHandler>();
         }
-
         if (cameraManager == null)
         {
             cameraManager = FindObjectOfType<CameraManager>();
             if (cameraManager == null)
-            {
                 Debug.LogError("[StaticPoseSelector] CameraManager not found. Please assign it in the Inspector.");
-            }
         }
     }
 
-    void Update()
+    // Called by RawImageClickHandler when a RawImage is clicked.
+    public void HandleRawImageClick(GameObject clickedRawImage)
     {
-        if (Input.GetMouseButtonDown(0))
+        Debug.Log($"[StaticPoseSelector] RawImage clicked: {clickedRawImage.name}");
+        if (!rawImageToRealPose.TryGetValue(clickedRawImage, out GameObject realPose))
         {
-            SelectPose();
+            Debug.LogWarning($"No real pose found for raw image '{clickedRawImage.name}'.");
+            return;
         }
-    }
-
-    void SelectPose()
-    {
-        Ray ray = mainCamera.ScreenPointToRay(Input.mousePosition);
-        if (Physics.Raycast(ray, out RaycastHit hit))
+        AddRectangleToPose(realPose);
+        if (newPoseBuffer1 == null)
         {
-            GameObject hitObject = hit.collider.gameObject;
-
-            if (hitObject.CompareTag("StaticPose"))
-            {
-                // Check if the clicked pose is one of the original selected poses
-                if (hitObject == selectedPose1 || hitObject == selectedPose2)
-                {
-                    Debug.Log("[StaticPoseSelector] Selected pose is already one of the two active poses.");
-                    return;
-                }
-
-                // Add a rectangle around the selected pose
-                AddRectangleToPose(hitObject);
-
-                // Handle new pose selection
-                if (newPoseBuffer1 == null)
-                {
-                    newPoseBuffer1 = hitObject; // Keep original name
-                    Debug.Log($"[StaticPoseSelector] New Pose 1 selected: {newPoseBuffer1.name}");
-                }
-                else if (newPoseBuffer2 == null)
-                {
-                    newPoseBuffer2 = hitObject; // Keep original name
-                    Debug.Log($"[StaticPoseSelector] New Pose 2 selected: {newPoseBuffer2.name}");
-
-                    // Two new poses selected, proceed to replace the original ones
-                    ReplaceSelectedPoses();
-                    AdjustHipJointRotation();
-                }
-                else
-                {
-                    Debug.Log("[StaticPoseSelector] Resetting selection due to a third new pose.");
-                    ResetNewPoseBuffer();
-                }
-            }
+            newPoseBuffer1 = clickedRawImage;
+            Debug.Log($"[StaticPoseSelector] New Pose 1 selected (RawImage): {clickedRawImage.name}");
         }
-    }
-
-    void AdjustHipJointRotation()
-    {
-        // Assuming both poses have a hip joint (can be identified by the name or specific tag)
-        Transform hipJoint1 = clonedPose1.transform.Find("mixamorig:Hips");  // Update with correct bone name or tag
-        Transform hipJoint2 = clonedPose2.transform.Find("mixamorig:Hips");  // Update with correct bone name or tag
-
-        if (hipJoint1 != null && hipJoint2 != null)
+        else if (newPoseBuffer2 == null)
         {
-            // Match the rotation of the second pose's hip joint to the first pose's hip joint
-            hipJoint2.rotation = hipJoint1.rotation;
-            Debug.Log("[StaticPoseSelector] Hip joint rotation of Pose 2 matched to Pose 1.");
+            newPoseBuffer2 = clickedRawImage;
+            Debug.Log($"[StaticPoseSelector] New Pose 2 selected (RawImage): {clickedRawImage.name}");
+            ReplaceSelectedPoses();
+            AdjustHipJointRotation();
         }
         else
         {
-            Debug.LogWarning("[StaticPoseSelector] Could not find hip joint in one or both poses.");
+            Debug.Log("[StaticPoseSelector] More than two selections detected. Resetting selection.");
+            ResetNewPoseBuffer();
         }
     }
 
     void AddRectangleToPose(GameObject pose)
     {
         if (poseRectangles.ContainsKey(pose))
-        {
-            // If rectangle already exists, do nothing
             return;
-        }
-
-        // Find the "mixamorig:Hips" transform in the pose hierarchy
         Transform hipsTransform = pose.transform.Find("mixamorig:Hips");
         if (hipsTransform == null)
         {
             Debug.LogWarning($"[StaticPoseSelector] mixamorig:Hips not found in {pose.name}. Rectangle not added.");
             return;
         }
-
-        // Create a new rectangle object
         GameObject rectangle = new GameObject($"{pose.name}_Rectangle");
         rectangle.transform.SetParent(pose.transform);
-        rectangle.transform.position = hipsTransform.position; // Align rectangle with the hips position
-
-        // Add LineRenderer component to draw the rectangle
-        LineRenderer lineRenderer = rectangle.AddComponent<LineRenderer>();
-        lineRenderer.positionCount = 5; // Four corners + one to close the rectangle
-        lineRenderer.startWidth = 0.02f;
-        lineRenderer.endWidth = 0.02f;
-        lineRenderer.useWorldSpace = true;
-
-        // Define rectangle corners based on the hips position and an arbitrary size
-        float rectWidth = 1.0f;  // Adjust width as needed
-        float rectHeight = 1.5f; // Adjust height as needed
-
+        rectangle.transform.position = hipsTransform.position;
+        LineRenderer lr = rectangle.AddComponent<LineRenderer>();
+        lr.positionCount = 5;
+        lr.startWidth = 0.02f;
+        lr.endWidth = 0.02f;
+        lr.useWorldSpace = true;
+        float rectW = 1.0f, rectH = 1.5f;
         Vector3[] corners = new Vector3[]
         {
-        hipsTransform.position + new Vector3(-rectWidth / 2, -rectHeight / 2, 0), // Bottom-left
-        hipsTransform.position + new Vector3(rectWidth / 2, -rectHeight / 2, 0),  // Bottom-right
-        hipsTransform.position + new Vector3(rectWidth / 2, rectHeight / 2, 0),   // Top-right
-        hipsTransform.position + new Vector3(-rectWidth / 2, rectHeight / 2, 0),  // Top-left
-        hipsTransform.position + new Vector3(-rectWidth / 2, -rectHeight / 2, 0)  // Closing the rectangle
+            hipsTransform.position + new Vector3(-rectW/2, -rectH/2, 0),
+            hipsTransform.position + new Vector3(rectW/2, -rectH/2, 0),
+            hipsTransform.position + new Vector3(rectW/2, rectH/2, 0),
+            hipsTransform.position + new Vector3(-rectW/2, rectH/2, 0),
+            hipsTransform.position + new Vector3(-rectW/2, -rectH/2, 0)
         };
-        lineRenderer.SetPositions(corners);
-
-        // Set line color
-        lineRenderer.material = new Material(Shader.Find("Sprites/Default"));
-        lineRenderer.startColor = Color.red;
-        lineRenderer.endColor = Color.red;
-
-        // Store rectangle reference
+        lr.SetPositions(corners);
+        lr.material = new Material(Shader.Find("Sprites/Default"));
+        lr.startColor = Color.red;
+        lr.endColor = Color.red;
+        rectangle.layer = pose.layer;
         poseRectangles[pose] = rectangle;
     }
 
@@ -540,162 +1167,285 @@ public class StaticPoseSelector : MonoBehaviour
         }
     }
 
-    GameObject AssignUniqueName(GameObject pose)
-    {
-        poseCounter++;
-        pose.name = $"{pose.name}_Unique_{poseCounter}";
-        return pose;
-    }
-
     void ResetNewPoseBuffer()
     {
         newPoseBuffer1 = null;
         newPoseBuffer2 = null;
     }
 
-    void ReplaceSelectedPoses()
+    // Clones the container (the parent of the real pose) and recreates a new RawImage.
+    // After cloning, it removes any old RawImage, creates a new one for the cloned preview camera,
+    // and sets the "mixamorig:Hips" child's local Y position to 0.
+    GameObject CloneContainerFromRawImage(GameObject rawImageSource, Vector2 dummy) // dummy parameter not used
     {
-        // Remove rectangles from previously selected poses
-        if (selectedPose1 != null) RemoveRectangleFromPose(selectedPose1);
-        if (selectedPose2 != null) RemoveRectangleFromPose(selectedPose2);
+        if (rawImageSource == null)
+            return null;
 
-        // Step 1: Clone the new poses and place them in the display positions
-        GameObject newClonedPose1 = ClonePose(newPoseBuffer1, "modelMainset", new Vector3(-960.69f, -535.5f, -0.17775f));
-        GameObject newClonedPose2 = ClonePose(newPoseBuffer2, "modelAdd1set", new Vector3(-956.2f,  -535.5f, -0.17775f));
-        // GameObject newClonedPose1 = ClonePose(newPoseBuffer1, "modelMainset", new Vector3(-1.5f, 1.2f, 0f));
-        // GameObject newClonedPose2 = ClonePose(newPoseBuffer2, "modelAdd1set", new Vector3(1f, 1.2f, 0f));
-
-        // Update selected poses
-        selectedPose1 = newPoseBuffer1;
-        selectedPose2 = newPoseBuffer2;
-
-        // Notify the CameraManager with the names of the new cloned poses
-        if (cameraManager != null)
+        if (!rawImageToRealPose.TryGetValue(rawImageSource, out GameObject realPose))
         {
-            string clonedPose1Name = newClonedPose1 != null ? newClonedPose1.name : null;
-            string clonedPose2Name = newClonedPose2 != null ? newClonedPose2.name : null;
-            cameraManager.UpdateSelectedPoseNames(clonedPose1Name, clonedPose2Name);
+            Debug.LogWarning("No real pose found for the given raw image.");
+            return null;
+        }
+
+        Transform originalContainer = realPose.transform.parent;
+        if (originalContainer == null)
+        {
+            Debug.LogWarning("Real pose has no parent container.");
+            return null;
+        }
+
+        GameObject containerClone = Instantiate(originalContainer.gameObject);
+        containerClone.name = originalContainer.gameObject.name + "_Clone_" + poseCounter++;
+
+        // Remove any children whose names contain "_Rectangle" from the clone.
+        foreach (Transform child in containerClone.GetComponentsInChildren<Transform>())
+        {
+            if (child.name.Contains("_Rectangle"))
+                Destroy(child.gameObject);
+        }
+
+        // Remove the old RawImage from the clone.
+        RawImage oldRaw = containerClone.GetComponentInChildren<RawImage>();
+        if (oldRaw != null)
+            Destroy(oldRaw.gameObject);
+
+        // Find the preview camera in the cloned container.
+        Camera clonedCamera = containerClone.GetComponentInChildren<Camera>();
+        if (clonedCamera == null)
+        {
+            Debug.LogWarning("No preview camera found in cloned container.");
+            return containerClone;
+        }
+        // Set the camera's cullingMask to include only valid layers.
+        int mainLayer = LayerMask.NameToLayer("modelMainset");
+        int addLayer = LayerMask.NameToLayer("modelAdd1set");
+        // If either layer is invalid (-1), use default (0)
+        if (mainLayer < 0 || addLayer < 0)
+        {
+            Debug.LogWarning("One or more target layers not found. Using default layer (0) for camera cullingMask.");
+            clonedCamera.cullingMask = 1 << 0;
         }
         else
         {
-            Debug.LogError("[StaticPoseSelector] CameraManager reference is missing.");
+            clonedCamera.cullingMask = (1 << mainLayer) | (1 << addLayer);
         }
 
-        // Notify the ForceAndTorqueVisualizer with the new cloned poses
-        NotifyForceAndTorqueVisualizer(newClonedPose1, newClonedPose2);
+        // Create a new RenderTexture and assign it to the cloned camera.
+        RenderTexture newRT = new RenderTexture(1024, 1024, 16);
+        clonedCamera.targetTexture = newRT;
 
-        // Step 3: Destroy the previously cloned poses (not the originals)
-        if (clonedPose1 != null) Destroy(clonedPose1);
-        if (clonedPose2 != null) Destroy(clonedPose2);
+        // Create a new RawImage for the cloned camera.
+        GameObject newRawImgObj = new GameObject(containerClone.name + "_RawImage");
+        RawImage newRawImg = newRawImgObj.AddComponent<RawImage>();
+        newRawImg.texture = newRT;
+        RectTransform rawImgRT = newRawImg.GetComponent<RectTransform>();
+        rawImgRT.sizeDelta = new Vector2(30, 30); // adjust size as needed
+        // (Anchored position will be set later.)
+        newRawImgObj.tag = "StaticPose";
+        if (newRawImgObj.GetComponent<RawImageClickHandler>() == null)
+            newRawImgObj.AddComponent<RawImageClickHandler>();
 
-        // Step3.1: set the clonedPose2's mixamorig:Hips' y position == clonedPose1's mixamorig:Hips' position
-        Transform hipJoint1 = newClonedPose1.transform.Find("mixamorig:Hips");
-        Transform hipJoint2 = newClonedPose2.transform.Find("mixamorig:Hips");
-        Debug.Log("[StaticPoseSelector] Original hip 2 position: " + hipJoint2.position.y);
-        hipJoint2.position = new Vector3(hipJoint2.position.x, hipJoint1.position.y, hipJoint2.position.z);
-        Debug.Log("[StaticPoseSelector] New hip 2 position: " + hipJoint2.position.y);
+        newRawImgObj.transform.SetParent(containerClone.transform, false);
 
-        // Step 4: Update the cloned poses references to the new clones
-        clonedPose1 = newClonedPose1;
-        clonedPose2 = newClonedPose2;
+        // find GameObject clonedPose to the containerClone object's child that contains name "_pose_"
+        GameObject clonedPose = containerClone.GetComponentsInChildren<Transform>()
+                                              .FirstOrDefault(t => t.name.Contains("_pose_"))
+                                              ?.gameObject;
 
-        // Step 5: Reset the temporary buffers
+        // Set the "mixamorig:Hips" child's local Y position to 0.
+        Transform hips = clonedPose.GetComponentsInChildren<Transform>()
+                                              .FirstOrDefault(t => t.name.Contains("mixamorig:Hips"))
+                                              ?.gameObject.transform;
+        if (hips != null)
+        {
+            Vector3 pos = hips.localPosition;
+            Debug.Log("hip, pos: " + hips.name + " " + pos);
+            hips.localPosition = new Vector3(pos.x, 0f, pos.z);
+            Debug.Log("Local hips position: " + hips.localPosition);
+
+        }
+        else
+        {
+            Debug.LogWarning("mixamorig:Hips not found in cloned container.");
+        }
+
+        return containerClone;
+    }
+
+    // Helper: Recursively finds a child by name.
+    Transform FindChildByName(GameObject parent, string name)
+    {
+        Debug.Log("Finding child: " + name + " in " + parent.name);
+        foreach (Transform child in parent.transform)
+        {
+            if (child.name == name)
+                Debug.Log("--------------!!!!!Found child: " + child.name);
+            return child;
+            Transform found = FindChildByName(child.gameObject, name);
+            if (found != null)
+                return found;
+        }
+        Debug.Log("Not found child: " + name);
+        return null;
+    }
+
+    void ReplaceSelectedPoses()
+    {
+        if (selectedPose1 != null) RemoveRectangleFromPose(selectedPose1);
+        if (selectedPose2 != null) RemoveRectangleFromPose(selectedPose2);
+
+        GameObject realPose1 = null;
+        GameObject realPose2 = null;
+        if (newPoseBuffer1 != null)
+            rawImageToRealPose.TryGetValue(newPoseBuffer1, out realPose1);
+        if (newPoseBuffer2 != null)
+            rawImageToRealPose.TryGetValue(newPoseBuffer2, out realPose2);
+
+        // Set desired anchored positions.
+        Vector2 desiredAnchoredPos1 = new Vector2(-31.3f, 9.9f); // For pose 1
+        Vector2 desiredAnchoredPos2 = new Vector2(-76f, 17f);    // For pose 2
+
+        GameObject containerClone1 = CloneContainerFromRawImage(newPoseBuffer1, Vector2.zero);
+        GameObject containerClone2 = CloneContainerFromRawImage(newPoseBuffer2, Vector2.zero);
+
+        // set the camera under containerClone1's cullingmask to "modelMainset", and the camera under containerClone2's cullingmask to "modelAdd1set"
+        Camera clonedCamera1 = containerClone1.GetComponentInChildren<Camera>();
+        Camera clonedCamera2 = containerClone2.GetComponentInChildren<Camera>();
+        if (clonedCamera1 != null)
+            clonedCamera1.cullingMask = 1 << LayerMask.NameToLayer("modelMainset");
+        if (clonedCamera2 != null)
+            clonedCamera2.cullingMask = 1 << LayerMask.NameToLayer("modelAdd1set");
+
+        RectTransform rawImgRT1 = containerClone1.GetComponentInChildren<RawImage>()?.GetComponent<RectTransform>();
+        if (rawImgRT1 != null)
+            rawImgRT1.anchoredPosition = desiredAnchoredPos1;
+        RectTransform rawImgRT2 = containerClone2.GetComponentInChildren<RawImage>()?.GetComponent<RectTransform>();
+        if (rawImgRT2 != null)
+            rawImgRT2.anchoredPosition = desiredAnchoredPos2;
+
+
+        // Retrieve the cloned pose from each container (assumed to be the parent of "mixamorig:Hips").
+        clonedPose1 = containerClone1.GetComponentsInChildren<Transform>()
+                                              .FirstOrDefault(t => t.name.Contains("_pose_"))
+                                              ?.gameObject;
+        clonedPose2 = containerClone2.GetComponentsInChildren<Transform>()
+                                              .FirstOrDefault(t => t.name.Contains("_pose_"))
+                                              ?.gameObject;
+        Debug.Log("found two cloned pose: " + clonedPose1.name + " " + clonedPose2.name);
+
+        AdjustAngleArcLineRenderer(realPose1, clonedPose1);
+        AdjustAngleArcLineRenderer(realPose2, clonedPose2);
+
+        SetLayerRecursively(containerClone1, "modelMainset");
+        SetLayerRecursively(containerClone2, "modelAdd1set");
+
+        // Clone corresponding video frames.
+        GameObject frameClone1 = CloneCorrespondingFrame(newPoseBuffer1, new Vector2(-843, 373), new Vector2(400, 250));
+        GameObject frameClone2 = CloneCorrespondingFrame(newPoseBuffer2, new Vector2(-430, 373), new Vector2(400, 250));
+
+        if (canvasResultMotionParent != null)
+        {
+            if (containerClone1 != null)
+                containerClone1.transform.SetParent(canvasResultMotionParent.transform, false);
+            if (containerClone2 != null)
+                containerClone2.transform.SetParent(canvasResultMotionParent.transform, false);
+            if (frameClone1 != null)
+                frameClone1.transform.SetParent(canvasResultMotionParent.transform, false);
+            if (frameClone2 != null)
+                frameClone2.transform.SetParent(canvasResultMotionParent.transform, false);
+        }
+        else
+        {
+            Debug.LogError("[StaticPoseSelector] canvasResultMotionParent is not assigned.");
+        }
+
+        selectedPose1 = realPose1;
+        selectedPose2 = realPose2;
+        NotifyForceAndTorqueVisualizer(selectedPose1, selectedPose2);
+
+        if (clonedContainer1 != null) Destroy(clonedContainer1);
+        if (clonedContainer2 != null) Destroy(clonedContainer2);
+
+        clonedContainer1 = containerClone1;
+        clonedContainer2 = containerClone2;
+
+        if (cameraManager != null && clonedPose1 != null && clonedPose2 != null)
+        {
+            Debug.Log("clonedposes are: " + clonedPose1.name + " " + clonedPose2.name);
+            cameraManager.UpdateSelectedPoseNames(clonedPose1.name, clonedPose2.name);
+        }
+        else
+        {
+            Debug.LogError("[StaticPoseSelector] CameraManager reference is missing or cloned poses are null.");
+        }
+
         ResetNewPoseBuffer();
     }
 
-    GameObject ClonePose(GameObject poseBuffer, string layerName, Vector3 displayPosition)
+    GameObject CloneCorrespondingFrame(GameObject rawImage, Vector2 anchoredPosition, Vector2 sizeDelta)
     {
-        if (poseBuffer == null) return null;
-
-        // Clone the pose
-        GameObject clonedPose = Instantiate(poseBuffer, Vector3.zero, Quaternion.identity);
-        clonedPose.name = $"{poseBuffer.name}_Cloned_{poseCounter++}";
-        SetLayerRecursively(clonedPose, LayerMask.NameToLayer(layerName));
-        clonedPose.transform.Rotate(180, 180, 0); // Adjust orientation
-        clonedPose.tag = "Untagged";
-        clonedPose.transform.SetParent(motionParent.transform);
-        //The cloned pose’s position is set based on the corresponding poseBuffer: If the poseBuffer is newPoseBuffer1, the cloned pose is placed at the position (-877.1, 377, 0) in local space. If the poseBuffer is newPoseBuffer2, the cloned pose is placed at the position (-392.8, 377, 0) in local space. This ensures each cloned pose is positioned accurately in the scene based on its association with the original poseBuffer.
-
-        // Remove the "_Rectangle" child from the clone
-        RemoveChildByName(clonedPose, $"{poseBuffer.name}_Rectangle");
-
-        // Adjust the root position so the mixamorig:Hips position matches the original
-        clonedPose.transform.localPosition = poseBuffer == newPoseBuffer1 ? new Vector3(-960.69f, -535.5f, -0.17775f) : new Vector3(-956.2f,  -535.5f, -0.17775f);
-        // AlignPoseHips(poseBuffer, clonedPose, displayPosition);
-        
-
-        // Adjust LineRenderer positions for AngleArc
-        AdjustAngleArcLineRenderer(poseBuffer, clonedPose);
-
-        // Find and clone the corresponding frame
-        string playerName = GetPlayerNameFromPoseName(poseBuffer.name);
-        int frameNumber = GetFrameNumberFromPoseName(poseBuffer.name);
+        if (!rawImageToRealPose.TryGetValue(rawImage, out GameObject realPose))
+        {
+            Debug.LogWarning($"No real pose found for raw image '{rawImage.name}' when cloning frame.");
+            return null;
+        }
+        string playerName = GetPlayerNameFromPoseName(realPose.name);
+        int frameNumber = GetFrameNumberFromPoseName(realPose.name);
         GameObject correspondingFrame = FindCorrespondingFrame(playerName, frameNumber);
         if (correspondingFrame != null)
         {
             Debug.Log($"[StaticPoseSelector] Corresponding frame found for Player: {playerName}, Frame: {frameNumber}");
-            // Clone the frame and place it over the cloned pose
-            GameObject clonedFrame = Instantiate(correspondingFrame, clonedPose.transform.position, Quaternion.identity);
-            clonedFrame.name = $"{correspondingFrame.name}_Cloned_{playerName}";
-            // set clone frame's parent as the clonedPose's parent
-            clonedFrame.transform.SetParent(clonedPose.transform.parent);
-            // The cloned frame’s position is set relative to the canvas using its RectTransform: If the poseBuffer is newPoseBuffer1, the cloned frame is positioned(Pos X, Pos Y, Pos Z) - (-878.3, 397.2, -0.1375847) Scale (1.5, 1.5, 1.5) in canvas space. If the poseBuffer is newPoseBuffer2, the cloned frame is positioned at (Pos X, Pos Y, Pos Z) - (-418.1, 397.2, -0.1777515) Scale (1.5, 1.5, 1.5) in canvas space.
-            RectTransform rectTransform = clonedFrame.GetComponent<RectTransform>();
-            rectTransform.localPosition = poseBuffer == newPoseBuffer1 ? new Vector3(-418.1f, 397.2f, -0.1777515f) : new Vector3(-878.3f, 397.2f, -0.1375847f);
-            rectTransform.localScale = new Vector3(1.5f, 1.5f, 1.5f);
+            GameObject clonedFrame = Instantiate(correspondingFrame);
+            clonedFrame.name = $"{correspondingFrame.name}_Clone_{playerName}";
+            RectTransform rt = clonedFrame.GetComponent<RectTransform>();
+            if (rt != null)
+            {
+                rt.anchoredPosition = anchoredPosition;
+                rt.sizeDelta = sizeDelta;
+            }
+            return clonedFrame;
         }
         else
         {
             Debug.LogWarning($"[StaticPoseSelector] Corresponding frame not found for Player: {playerName}, Frame: {frameNumber}");
+            return null;
         }
-
-        return clonedPose;
     }
 
     private string GetPlayerNameFromPoseName(string poseName)
     {
-        // Pose name format: PlayerName_pose_FrameNum
         string[] parts = poseName.Split('_');
         return parts.Length > 0 ? parts[0] : null;
     }
 
     private int GetFrameNumberFromPoseName(string poseName)
     {
-        // Pose name format: PlayerName_pose_FrameNum
         string[] parts = poseName.Split('_');
         if (parts.Length > 2 && int.TryParse(parts[2], out int frameNum))
-        {
             return frameNum;
-        }
         return -1;
     }
 
     private GameObject FindCorrespondingFrame(string playerName, int frameNumber)
     {
-        // Find CanvasSetup
         GameObject canvasObject = GameObject.Find("CanvasSetup");
         if (canvasObject == null)
         {
             Debug.LogError("[StaticPoseSelector] Canvas named 'CanvasSetup' not found.");
             return null;
         }
-
         Canvas canvasSetup = canvasObject.GetComponent<Canvas>();
         if (canvasSetup == null)
         {
             Debug.LogError("[StaticPoseSelector] 'CanvasSetup' does not have a Canvas component.");
             return null;
         }
-
-        // Find VideoContainer
         Transform videoContainer = canvasSetup.transform.Find("VideoContainer");
         if (videoContainer == null)
         {
             Debug.LogError("[StaticPoseSelector] VideoContainer not found.");
             return null;
         }
-
-        // Find Player's VideoContainer
         string playerVideoContainerName = $"{playerName}Video";
         Transform playerVideoContainer = videoContainer.Find(playerVideoContainerName);
         if (playerVideoContainer == null)
@@ -703,120 +1453,42 @@ public class StaticPoseSelector : MonoBehaviour
             Debug.LogError($"[StaticPoseSelector] VideoContainer for Player '{playerName}' not found.");
             return null;
         }
-
-        // Find FrameContainer
-        Transform frameContainer = null;
+        Transform frameCont = null;
         foreach (Transform child in playerVideoContainer)
         {
             if (child.name.StartsWith("FrameContainer"))
             {
-                frameContainer = child;
+                frameCont = child;
                 break;
             }
         }
-
-        if (frameContainer == null)
+        if (frameCont == null)
         {
             Debug.LogError($"[StaticPoseSelector] FrameContainer not found under {playerVideoContainerName}.");
             return null;
         }
-
-        // Find the specific frame
         string frameName = $"Frame_{frameNumber}";
-        Transform frame = frameContainer.Find(frameName);
+        Transform frame = frameCont.Find(frameName);
         if (frame == null)
         {
             Debug.LogError($"[StaticPoseSelector] Frame '{frameName}' not found in FrameContainer.");
             return null;
         }
-
         return frame.gameObject;
     }
 
-    void RemoveChildByName(GameObject parent, string childName)
+    void AdjustHipJointRotation()
     {
-        Transform child = parent.transform.Find(childName);
-        if (child != null) Destroy(child.gameObject);
-    }
-
-    // void AlignPoseHips(GameObject originalPose, GameObject clonedPose, Vector3 displayPosition)
-    // {
-    //     Transform originalHips = originalPose.transform.Find("mixamorig:Hips");
-    //     Transform clonedHips = clonedPose.transform.Find("mixamorig:Hips");
-
-    //     if (originalHips != null && clonedHips != null)
-    //     {
-    //         Vector3 hipsOffset = originalHips.position - originalPose.transform.position;
-    //         // clonedPose.transform.position = displayPosition - hipsOffset;
-    //     }
-    //     else
-    //     {
-    //         Debug.LogWarning("[StaticPoseSelector] mixamorig:Hips not found on one of the poses.");
-    //     }
-    // }
-
-    void AdjustAngleArcLineRenderer(GameObject originalPose, GameObject clonedPose)
-    {
-        Transform originalAngleArc = originalPose.transform.Find("AngleArc");
-        Transform originalHips = originalPose.transform.Find("mixamorig:Hips");
-        Transform clonedAngleArc = clonedPose.transform.Find("AngleArc");
-        Transform clonedHips = clonedPose.transform.Find("mixamorig:Hips");
-
-        if (originalAngleArc == null || originalHips == null || clonedAngleArc == null || clonedHips == null)
+        Transform hipJoint1 = clonedPose1.transform.Find("mixamorig:Hips");
+        Transform hipJoint2 = clonedPose2.transform.Find("mixamorig:Hips");
+        if (hipJoint1 != null && hipJoint2 != null)
         {
-            Debug.LogWarning("Could not find AngleArc or mixamorig:Hips in the original or cloned poses.");
-            return;
-        }
-
-        LineRenderer originalLineRenderer = originalAngleArc.GetComponent<LineRenderer>();
-        LineRenderer clonedLineRenderer = clonedAngleArc.GetComponent<LineRenderer>();
-
-        if (originalLineRenderer == null || clonedLineRenderer == null)
-        {
-            Debug.LogWarning("LineRenderer not found on AngleArc in original or cloned object.");
-            return;
-        }
-
-        // Get the positions of the LineRenderer in world space
-        int positionCount = originalLineRenderer.positionCount;
-        Vector3[] originalPositions = new Vector3[positionCount];
-        originalLineRenderer.GetPositions(originalPositions);
-
-        // Calculate relative positions of the LineRenderer points to original mixamorig:Hips
-        Vector3[] relativePositions = new Vector3[positionCount];
-        for (int i = 0; i < positionCount; i++)
-        {
-            relativePositions[i] = originalHips.InverseTransformPoint(originalPositions[i]);
-        }
-
-        // Apply the relative positions to the cloned LineRenderer
-        Vector3[] clonedPositions = new Vector3[positionCount];
-        for (int i = 0; i < positionCount; i++)
-        {
-            clonedPositions[i] = clonedHips.TransformPoint(relativePositions[i]);
-        }
-
-        clonedLineRenderer.SetPositions(clonedPositions);
-    }
-
-    void SetLayerRecursively(GameObject obj, int layer)
-    {
-        obj.layer = layer;
-        foreach (Transform child in obj.transform)
-        {
-            SetLayerRecursively(child.gameObject, layer);
-        }
-    }
-
-    void InformCameraManager()
-    {
-        if (cameraManager != null)
-        {
-            cameraManager.UpdateSelectedPoseNames(clonedPose1.name, clonedPose2.name);
+            hipJoint2.rotation = hipJoint1.rotation;
+            Debug.Log("[StaticPoseSelector] Hip joint rotation of Pose 2 matched to Pose 1.");
         }
         else
         {
-            Debug.LogError("[StaticPoseSelector] CameraManager reference is missing.");
+            Debug.LogWarning("[StaticPoseSelector] Could not find hip joint in one or both poses.");
         }
     }
 
@@ -826,11 +1498,61 @@ public class StaticPoseSelector : MonoBehaviour
         {
             forceAndTorqueVisualizer.SetPoses(pose1, pose2);
             Debug.Log("[StaticPoseSelector] ForceAndTorqueVisualizer updated with new poses.");
-
         }
         else
         {
             Debug.LogError("[StaticPoseSelector] ForceAndTorqueVisualizer reference is missing.");
         }
+    }
+
+    void SetLayerRecursively(GameObject obj, string layer)
+    {
+        Debug.Log($"Setting layer of {obj.name} to {layer}");
+        obj.layer = LayerMask.NameToLayer(layer);
+        foreach (Transform child in obj.transform)
+        {
+            SetLayerRecursively(child.gameObject, layer);
+        }
+    }
+
+    void RemoveChildByName(GameObject parent, string childName)
+    {
+        Transform child = parent.transform.Find(childName);
+        if (child != null)
+            Destroy(child.gameObject);
+    }
+
+    void AdjustAngleArcLineRenderer(GameObject originalPose, GameObject clonedPose)
+    {
+        Transform originalAngleArc = originalPose.transform.Find("AngleArc");
+        Transform originalHips = originalPose.transform.Find("mixamorig:Hips");
+        Transform clonedAngleArc = clonedPose.transform.Find("AngleArc");
+        Transform clonedHips = clonedPose.transform.Find("mixamorig:Hips");
+        if (originalAngleArc == null || originalHips == null || clonedAngleArc == null || clonedHips == null)
+        {
+            Debug.LogWarning("Could not find AngleArc or mixamorig:Hips in the original or cloned poses.");
+            return;
+        }
+        LineRenderer originalLineRenderer = originalAngleArc.GetComponent<LineRenderer>();
+        LineRenderer clonedLineRenderer = clonedAngleArc.GetComponent<LineRenderer>();
+        if (originalLineRenderer == null || clonedLineRenderer == null)
+        {
+            Debug.LogWarning("LineRenderer not found on AngleArc in original or cloned object.");
+            return;
+        }
+        int positionCount = originalLineRenderer.positionCount;
+        Vector3[] originalPositions = new Vector3[positionCount];
+        originalLineRenderer.GetPositions(originalPositions);
+        Vector3[] relativePositions = new Vector3[positionCount];
+        for (int i = 0; i < positionCount; i++)
+        {
+            relativePositions[i] = originalHips.InverseTransformPoint(originalPositions[i]);
+        }
+        Vector3[] clonedPositions = new Vector3[positionCount];
+        for (int i = 0; i < positionCount; i++)
+        {
+            clonedPositions[i] = clonedHips.TransformPoint(relativePositions[i]);
+        }
+        clonedLineRenderer.SetPositions(clonedPositions);
     }
 }

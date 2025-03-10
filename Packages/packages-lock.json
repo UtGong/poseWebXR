@@ -18,6 +18,13 @@
       },
       "url": "https://package.openupm.com"
     },
+    "com.nobi.roundedcorners": {
+      "version": "git@github.com:kirevdokimov/Unity-UI-Rounded-Corners.git",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {},
+      "hash": "33135342e868201eb0d4cef821ecab90caca373e"
+    },
     "com.unity.2d.sprite": {
       "version": "1.0.0",
       "depth": 0,
@@ -128,7 +135,7 @@
       }
     },
     "com.unity.render-pipelines.universal": {
-      "version": "14.0.11",
+      "version": "12.1.15",
       "depth": 0,
       "source": "builtin",
       "dependencies": {
@@ -271,7 +278,7 @@
       "url": "https://packages.unity.com"
     },
     "com.unity.xr.interaction.toolkit": {
-      "version": "2.6.3",
+      "version": "2.6.4",
       "depth": 0,
       "source": "registry",
       "dependencies": {
