@@ -41,7 +41,7 @@ public class PopupManager : MonoBehaviour
         textRect.sizeDelta = new Vector2(1080, 460); // Slightly smaller than the popup
         Text instructions = textObj.AddComponent<Text>();
         instructions.text = "- Press the Add Cameras button to add cameras from different perspectives.\n\n" +
-                            "- To adjust the position and perspective of a camera, click the corresponding colored sphere.\n\n" +
+                            "- To adjust the position and perspective of a camera, click the corresponding frame\n\n" +
                             "- Use W, A, S, D to move the camera along the X and Y axes, Q, E to move along the Z axis.\n\n" +
                             "- Use the scroll wheel or touchpad to adjust the camera's rotation.";
         instructions.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
