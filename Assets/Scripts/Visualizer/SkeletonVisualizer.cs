@@ -1,32 +1,31 @@
 // using UnityEngine;
 // using UnityEngine.UI;
-// using TMPro; // Import TextMeshPro namespace
+// using TMPro;
 // using System.Linq;
 // using System.Collections.Generic;
 
-// [ExecuteAlways] // Allows Gizmos to work in the editor
+// [ExecuteAlways]
 // public class SkeletonVisualizer : MonoBehaviour
 // {
 //     [Header("Visualization Settings")]
 //     public float maxDistanceThreshold = 5.0f;
-
 //     public Color normalBoneColor = Color.green;
-
 //     public float lineThickness = 0.02f;
-
 //     public float jointSphereSize = 0.02f;
 
 //     [Header("UI Settings")]
-//     public Button toggleGizmosButton; 
-//     public TMP_Text buttonLabel; 
+//     public Button toggleGizmosButton;
+//     public TMP_Text buttonLabel;
 
 //     [Header("Parent Object Settings")]
-//     public Transform motionParent; // The motionParent containing children to search for poses
+//     public Transform motionParent;
 
-//     private bool showGizmos = false; // State to track Gizmos visibility
-//     private Transform mainPose; // The main pose (smaller X-axis)
-//     private Transform additionalPose; // The additional pose (larger X-axis)
-//     private List<GameObject> visualizedObjects = new List<GameObject>(); // Store created GameObjects
+//     private bool showGizmos = false;
+//     private Transform mainPose;
+//     private Transform additionalPose;
+//     private List<GameObject> visualizedObjects = new List<GameObject>();
+
+//     private readonly string[] componentsToToggle = { "Beta_Joints", "Beta_Surface", "AngleArc", "AngleLabel" };
 
 //     private void Start()
 //     {
@@ -48,79 +47,71 @@
 //             return;
 //         }
 
-//         // Toggle visualization state
 //         showGizmos = !showGizmos;
 
 //         if (showGizmos)
 //         {
-//             var poses = motionParent.GetComponentsInChildren<Transform>()
-//                                     .Where(child => child.name.ToLower().Contains("pose"))
-//                                     .Take(2)
-//                                     .ToArray();
+//             AssignPoses();
+//             if (mainPose == null || additionalPose == null) return;
 
-//             if (poses.Length < 2)
-//             {
-//                 Debug.LogWarning("[SkeletonVisualizer] Less than two poses found in motionParent!");
-//                 return;
-//             }
-
-//             // Determine main and additional poses based on X-axis position
-//             if (poses[0].position.x < poses[1].position.x)
-//             {
-//                 mainPose = poses[0];
-//                 additionalPose = poses[1];
-//             }
-//             else
-//             {
-//                 mainPose = poses[1];
-//                 additionalPose = poses[0];
-//             }
-
-//             Debug.Log($"[SkeletonVisualizer] Main Pose: {mainPose.name}, Additional Pose: {additionalPose.name}");
-
-//             // Disable Beta_Joints and Beta_Surface for both poses
-//             DisableBetaComponents(mainPose, "Beta_Joints");
-//             DisableBetaComponents(mainPose, "Beta_Surface");
-//             DisableBetaComponents(mainPose, "AngleArc");
-//             DisableBetaComponents(mainPose, "AngleLabel");
-//             DisableBetaComponents(additionalPose, "Beta_Joints");
-//             DisableBetaComponents(additionalPose, "Beta_Surface");
-//             DisableBetaComponents(additionalPose, "AngleArc");
-//             DisableBetaComponents(additionalPose, "AngleLabel");
-
-//             // Visualize skeletons for both poses
+//             ToggleBetaComponents(false);
 //             VisualizeSkeleton(mainPose, "modelMainset");
 //             VisualizeSkeleton(additionalPose, "modelAdd1set");
 //         }
 //         else
 //         {
-//             Debug.Log("[SkeletonVisualizer] Removing visualized skeletons.");
-
-//             // Re-enable Beta components
-//             EnableBetaComponents(mainPose, "Beta_Joints");
-//             EnableBetaComponents(mainPose, "Beta_Surface");
-//             EnableBetaComponents(mainPose, "AngleArc");
-//             EnableBetaComponents(mainPose, "AngleLabel");
-//             EnableBetaComponents(additionalPose, "Beta_Joints");
-//             EnableBetaComponents(additionalPose, "Beta_Surface");
-//             EnableBetaComponents(additionalPose, "AngleArc");
-//             EnableBetaComponents(additionalPose, "AngleLabel");
-
-//             // Destroy created GameObjects
-//             foreach (GameObject obj in visualizedObjects)
-//             {
-//                 Destroy(obj);
-//             }
-//             visualizedObjects.Clear();
+//             ToggleBetaComponents(true);
+//             ClearVisualizedObjects();
 //         }
 
-//         if (buttonLabel != null)
+//         UpdateButtonLabel();
+//     }
+
+//     private void AssignPoses()
+//     {
+//         var poses = motionParent.GetComponentsInChildren<Transform>()
+//                                 .Where(child => child.name.ToLower().Contains("pose"))
+//                                 .Take(2)
+//                                 .ToArray();
+
+//         if (poses.Length < 2)
 //         {
-//             buttonLabel.text = showGizmos ? "Disable Skeleton" : "Enable Skeleton";
+//             Debug.LogWarning("[SkeletonVisualizer] Less than two poses found in motionParent!");
+//             return;
+//         }
+
+//         if (poses[0].position.x < poses[1].position.x)
+//         {
+//             mainPose = poses[0];
+//             additionalPose = poses[1];
 //         }
 //         else
 //         {
-//             Debug.LogWarning("[SkeletonVisualizer] TMP_Text for button label not assigned!");
+//             mainPose = poses[1];
+//             additionalPose = poses[0];
+//         }
+
+//         Debug.Log($"[SkeletonVisualizer] Main Pose: {mainPose.name}, Additional Pose: {additionalPose.name}");
+//     }
+
+//     private void ToggleBetaComponents(bool enable)
+//     {
+//         foreach (string component in componentsToToggle)
+//         {
+//             SetBetaComponentState(mainPose, component, enable);
+//             SetBetaComponentState(additionalPose, component, enable);
+//         }
+//     }
+
+//     private void SetBetaComponentState(Transform parent, string componentName, bool state)
+//     {
+//         if (parent == null) return;
+
+//         Transform child = parent.Find(componentName);
+//         if (child != null)
+//         {
+//             child.gameObject.SetActive(state);
+//             Debug.Log($"[SkeletonVisualizer] {(state ? "Enabled" : "Disabled")} {componentName} for {parent.name}");
 //         }
 //     }
 
@@ -128,23 +119,15 @@
 //     {
 //         if (pose == null) return;
 
-//         Transform[] childTransforms = pose.GetComponentsInChildren<Transform>();
-
-//         foreach (Transform child in childTransforms)
+//         foreach (Transform child in pose.GetComponentsInChildren<Transform>())
 //         {
-//             if (child.parent != null)
-//             {
-//                 float distance = Vector3.Distance(child.position, child.parent.position);
-//                 if (distance < maxDistanceThreshold)
-//                 {
-//                     // Create line (bone)
-//                     GameObject line = CreateBone(child.position, child.parent.position, layerName);
-//                     visualizedObjects.Add(line);
+//             if (child.parent == null) continue;
 
-//                     // Create joint (sphere)
-//                     GameObject sphere = CreateJoint(child.position, layerName);
-//                     visualizedObjects.Add(sphere);
-//                 }
+//             float distance = Vector3.Distance(child.position, child.parent.position);
+//             if (distance < maxDistanceThreshold)
+//             {
+//                 visualizedObjects.Add(CreateBone(child.position, child.parent.position, layerName));
+//                 visualizedObjects.Add(CreateJoint(child.position, layerName));
 //             }
 //         }
 //     }
@@ -158,10 +141,7 @@
 //         lr.material = new Material(Shader.Find("Sprites/Default"));
 //         lr.startColor = normalBoneColor;
 //         lr.endColor = normalBoneColor;
-//         lr.SetPosition(0, start);
-//         lr.SetPosition(1, end);
-
-//         // Assign layer
+//         lr.SetPositions(new Vector3[] { start, end });
 //         line.layer = LayerMask.NameToLayer(layerName);
 
 //         return line;
@@ -173,33 +153,33 @@
 //         sphere.transform.position = position;
 //         sphere.transform.localScale = Vector3.one * jointSphereSize;
 //         sphere.GetComponent<Renderer>().material.color = normalBoneColor;
-
-//         // Assign layer
 //         sphere.layer = LayerMask.NameToLayer(layerName);
 
 //         return sphere;
 //     }
 
-//     private void DisableBetaComponents(Transform parent, string childName)
+//     private void ClearVisualizedObjects()
 //     {
-//         Transform child = parent.Find(childName);
-//         if (child != null)
+//         foreach (GameObject obj in visualizedObjects)
 //         {
-//             child.gameObject.SetActive(false);
-//             Debug.Log($"[SkeletonVisualizer] Disabled {childName} for {parent.name}");
+//             Destroy(obj);
 //         }
+//         visualizedObjects.Clear();
 //     }
 
-//     private void EnableBetaComponents(Transform parent, string childName)
+//     private void UpdateButtonLabel()
 //     {
-//         Transform child = parent.Find(childName);
-//         if (child != null)
+//         if (buttonLabel != null)
 //         {
-//             child.gameObject.SetActive(true);
-//             Debug.Log($"[SkeletonVisualizer] Enabled {childName} for {parent.name}");
+//             buttonLabel.text = showGizmos ? "Disable Skeleton" : "Enable Skeleton";
+//         }
+//         else
+//         {
+//             Debug.LogWarning("[SkeletonVisualizer] TMP_Text for button label not assigned!");
 //         }
 //     }
 // }
+
 
 using UnityEngine;
 using UnityEngine.UI;
@@ -228,7 +208,7 @@ public class SkeletonVisualizer : MonoBehaviour
     private Transform additionalPose;
     private List<GameObject> visualizedObjects = new List<GameObject>();
 
-    private readonly string[] componentsToToggle = { "Beta_Joints", "Beta_Surface", "AngleArc", "AngleLabel" };
+    private readonly string[] componentsToToggle = { "avaturn_body", "avaturn_hair_0", "avaturn_hair_1", "avaturn_hair_2", "avaturn_look_0", "avaturn_shoes_0", "AngleArc", "AngleLabel" };
 
     private void Start()
     {
@@ -272,26 +252,54 @@ public class SkeletonVisualizer : MonoBehaviour
 
     private void AssignPoses()
     {
-        var poses = motionParent.GetComponentsInChildren<Transform>()
-                                .Where(child => child.name.ToLower().Contains("pose"))
-                                .Take(2)
-                                .ToArray();
+        // 1) Only consider direct children of motionParent.
+        var containers = motionParent.transform
+            .Cast<Transform>()  // Enumerate the direct child transforms
+            .Where(t => t.name.ToLower().Contains("posecontainer"))
+            .Take(2)
+            .ToArray();
 
-        if (poses.Length < 2)
+        if (containers.Length < 2)
         {
-            Debug.LogWarning("[SkeletonVisualizer] Less than two poses found in motionParent!");
+            Debug.LogWarning("[SkeletonVisualizer] Less than two pose containers found under motionParent!");
             return;
         }
 
-        if (poses[0].position.x < poses[1].position.x)
+        // 2) Within each container, find the transform whose name contains "_pose".
+        var foundPoses = new List<Transform>();
+
+        foreach (var container in containers)
         {
-            mainPose = poses[0];
-            additionalPose = poses[1];
+            Transform pose = container
+                .GetComponentsInChildren<Transform>()
+                .FirstOrDefault(child => child.name.ToLower().Contains("_pose"));
+
+            if (pose != null)
+            {
+                foundPoses.Add(pose);
+            }
+            else
+            {
+                Debug.LogWarning($"[SkeletonVisualizer] No '_pose' child found under container: {container.name}");
+            }
+        }
+
+        if (foundPoses.Count < 2)
+        {
+            Debug.LogWarning("[SkeletonVisualizer] Did not find two '_pose' transforms under the selected containers!");
+            return;
+        }
+
+        // 3) Assign mainPose and additionalPose by X position (or whichever logic you prefer).
+        if (foundPoses[0].position.x < foundPoses[1].position.x)
+        {
+            mainPose = foundPoses[1];
+            additionalPose = foundPoses[0];
         }
         else
         {
-            mainPose = poses[1];
-            additionalPose = poses[0];
+            mainPose = foundPoses[0];
+            additionalPose = foundPoses[1];
         }
 
         Debug.Log($"[SkeletonVisualizer] Main Pose: {mainPose.name}, Additional Pose: {additionalPose.name}");
@@ -322,14 +330,26 @@ public class SkeletonVisualizer : MonoBehaviour
     {
         if (pose == null) return;
 
-        foreach (Transform child in pose.GetComponentsInChildren<Transform>())
+        // 1) Find the "Armature" child under the pose
+        Transform armature = pose.Find("Armature");
+        if (armature == null)
         {
+            Debug.LogWarning($"[SkeletonVisualizer] 'Armature' not found under {pose.name}");
+            return;
+        }
+
+        // 2) Iterate over every child in the Armature hierarchy
+        foreach (Transform child in armature.GetComponentsInChildren<Transform>())
+        {
+            // Skip if this child has no parent
             if (child.parent == null) continue;
 
             float distance = Vector3.Distance(child.position, child.parent.position);
             if (distance < maxDistanceThreshold)
             {
+                // Create bone between child and its parent
                 visualizedObjects.Add(CreateBone(child.position, child.parent.position, layerName));
+                // Create sphere at the child’s joint position
                 visualizedObjects.Add(CreateJoint(child.position, layerName));
             }
         }
