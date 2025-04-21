@@ -37,7 +37,11 @@ public class CanvasGroupSwitcher : MonoBehaviour
         }
         foreach (Transform child in canvas2Group.transform)
         {
-            child.gameObject.SetActive(true);
+            if (child.name != "IntroPanel" && child.name != "PanelLeftDown_G2")
+            {
+                child.gameObject.SetActive(true);
+            }
+
         }
     }
 

@@ -8,6 +8,22 @@ public class PopupManager : MonoBehaviour
 
     private GameObject popup; // Popup GameObject
 
+
+    /// <summary>
+    /// 面板：对应面板
+    /// </summary>
+    public GameObject panel;
+
+    /// <summary>
+    /// 按钮：关闭
+    /// </summary>
+    private Button btnOK;
+
+    /// <summary>
+    /// 判定：显隐界面
+    /// </summary>
+    private bool isShow;
+
     void Start()
     {
         if (instructionButton == null || canvas == null)
@@ -16,7 +32,26 @@ public class PopupManager : MonoBehaviour
             return;
         }
 
-        instructionButton.onClick.AddListener(ShowPopup);
+        //instructionButton.onClick.AddListener(ShowPopup);
+
+        //初始隐藏
+        if (panel)
+        {
+            if (panel.activeSelf)
+            {
+                panel.SetActive(false);
+            }
+        }
+
+        instructionButton.onClick.AddListener(BtnFunc_PanelShowHide);
+
+        if (!btnOK)
+        {
+            btnOK = panel.transform.Find("btnOK").GetComponent<Button>();
+        }
+
+        btnOK.onClick.AddListener(BtnFunc_BtnOK);
+
     }
 
     void ShowPopup()
@@ -81,5 +116,34 @@ public class PopupManager : MonoBehaviour
         {
             Destroy(popup);
         }
+    }
+
+    /// <summary>
+    /// 按钮方法：面板显隐
+    /// </summary>
+    private void BtnFunc_PanelShowHide()
+    {
+        if (isShow)
+        {
+            isShow = false;
+
+            panel.SetActive(false);
+        }
+        else
+        {
+            isShow = true;
+
+            panel.SetActive(true);
+        }
+    }
+
+    /// <summary>
+    /// 按钮方法：关闭
+    /// </summary>
+    private void BtnFunc_BtnOK()
+    {
+        isShow = false;
+
+        panel.SetActive(false);
     }
 }

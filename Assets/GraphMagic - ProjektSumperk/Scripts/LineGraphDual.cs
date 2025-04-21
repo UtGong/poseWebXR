@@ -314,6 +314,9 @@ namespace ProjektSumperk
         public AnimationClip animationClip1; // Drag Animation Clip 1 into this field
         public AnimationClip animationClip2; // Drag Animation Clip 2 into this field
 
+        public GameObject character1;
+        public GameObject character2;
+
         public RectTransform graphContainer;
         public List<Vector2> dataPoints = new List<Vector2>(); // Simulate your dataPoints
         public List<Vector2> dataPointsSet2 = new List<Vector2>(); // Simulate your dataPoints2
@@ -361,8 +364,8 @@ namespace ProjektSumperk
             string animationClip2Name = Path.GetFileNameWithoutExtension(animationClip2.name);
 
             // Construct file paths
-            string filePath1 = $"Assets/SMPL-male|SMPL motion_joint_data.csv";
-            string filePath2 = $"Assets/SMPL-male|SMPL motion.001_joint_data.csv";
+            string filePath1 = $"Assets/{character1.name}_joint_data.csv";
+            string filePath2 = $"Assets/{character2.name}_joint_data.csv";
 
             // Load datasets and calculate global axis limits
             LoadDataForTwoClips(filePath1, filePath2, out dataPoints, out dataPointsSet2, out xMin, out xMax, out yMin, out yMax);

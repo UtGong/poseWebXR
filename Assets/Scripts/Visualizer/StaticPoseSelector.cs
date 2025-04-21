@@ -216,7 +216,7 @@ public class StaticPoseSelector : MonoBehaviour
         RawImage newRawImg = newRawImgObj.AddComponent<RawImage>();
         newRawImg.texture = newRT;
         RectTransform rawImgRT = newRawImg.GetComponent<RectTransform>();
-        rawImgRT.sizeDelta = new Vector2(30, 30); // adjust size as needed
+        rawImgRT.sizeDelta = new Vector2(20, 20); // adjust size as needed
         // (Anchored position will be set later.)
         newRawImgObj.tag = "StaticPose";
         if (newRawImgObj.GetComponent<RawImageClickHandler>() == null)
@@ -282,8 +282,8 @@ public class StaticPoseSelector : MonoBehaviour
             rawImageToRealPose.TryGetValue(newPoseBuffer2, out realPose2);
 
         // Set desired anchored positions.
-        Vector2 desiredAnchoredPos1 = new Vector2(-31.3f, 9.9f); // For pose 1
-        Vector2 desiredAnchoredPos2 = new Vector2(-76f, 17f);    // For pose 2
+        Vector2 desiredAnchoredPos1 = new Vector2(-31.3f, 17f); // For pose 1
+        Vector2 desiredAnchoredPos2 = new Vector2(-76f, 20f);    // For pose 2
 
         GameObject containerClone1 = CloneContainerFromRawImage(newPoseBuffer1, Vector2.zero);
         GameObject containerClone2 = CloneContainerFromRawImage(newPoseBuffer2, Vector2.zero);

@@ -133,7 +133,7 @@ public class DualBarChart : MonoBehaviour
         labelComponent.alignment = TextAnchor.MiddleCenter;
         labelComponent.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
         labelComponent.fontSize = 14;
-        labelComponent.color = Color.black;
+        labelComponent.color = Color.white;
 
         RectTransform labelRect = label.GetComponent<RectTransform>();
         labelRect.anchorMin = new Vector2(0.5f, belowBar ? 0f : 1f); // Place above or below the bar
@@ -168,7 +168,7 @@ public class DualBarChart : MonoBehaviour
         groupLabel.text = labelText;
         groupLabel.alignment = TextAlignmentOptions.Center;
         groupLabel.fontSize = 16;
-        groupLabel.color = Color.black;
+        groupLabel.color = Color.white;
         groupLabel.rectTransform.anchoredPosition = new Vector2(positionX, -160f); // Place label below the group
     }
 
